@@ -1,0 +1,12 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { scrollbar-width: thin; scrollbar-color: rgba(156,163,175,0.5) transparent; }
+  *::-webkit-scrollbar { width: 6px; height: 6px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb { background-color: rgba(156,163,175,0.5); border-radius: 10px; }
+  html { -webkit-font-smoothing: antialiased; }
+  body { @apply bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100; font-family: 'Inter', system-ui, sans-serif; }
+}
