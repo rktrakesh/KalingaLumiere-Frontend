@@ -1,27 +1,58 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { DollarSign, Play, RefreshCw, Eye, Lock, CheckCircle2, CreditCard, Banknote, AlertTriangle, FileText, Users, TrendingDown, IndianRupee, Printer, ChevronDown } from "lucide-react";
-import { payrollApi, DisburseRequest } from "@/services/api/payroll.api";
+import { DollarSign, Play, RefreshCw, Eye, Lock, Unlock, CheckCircle2, ShieldCheck, CreditCard, Banknote, AlertTriangle, Users, TrendingDown, IndianRupee, Printer, History, ListChecks, Search, FileText, ChevronRight } from "lucide-react";
+import { payrollApi, DisburseRequest, ReopenPayrollRequest, ActionRemarksRequest } from "@/services/api/payroll.api";
 import { DataTable, Column } from "@/components/common/DataTable";
 import { PageHeader } from "@/components/common/PageHeader";
 import { KPICard } from "@/components/common/KPICard";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
 import { Select } from "@/components/ui/Select";
-import { Badge, statusBadge } from "@/components/ui/Badge";
-import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
 import { ConfirmModal } from "@/components/common/ConfirmModal";
 import { useToast } from "@/hooks/useToast";
-import { PayrollRun, PayrollDetail } from "@/types";
+import { PayrollRun, PayrollDetail, PayrollCalculationLog, PayrollStatus } from "@/types";
 import { formatCurrency, formatDate, formatDateTime, MONTHS, currentYear, currentMonth } from "@/utils/format";
 import { cn } from "@/utils/cn";
 import { motion, AnimatePresence } from "framer-motion";
+
+// ── Status → badge variant (payroll lifecycle) ────────────────────────────────
+function payrollStatusVariant(status: PayrollStatus) {
+  switch (status) {
+    case "DRAFT":
+      return "neutral" as const;
+    case "CALCULATED":
+      return "info" as const;
+    case "VERIFIED":
+      return "purple" as const;
+    case "APPROVED":
+      return "warning" as const;
+    case "PROCESSED":
+      return "warning" as const;
+    case "PAID":
+      return "success" as const;
+    case "LOCKED":
+      return "neutral" as const;
+    default:
+      return "neutral" as const;
+  }
+}
 
 // ── Payslip PDF Generator (pure browser, no library needed) ──────────────────
 function generatePayslipHTML(detail: PayrollDetail, run: PayrollRun, companyName = "KalingaLumière Agarbatti"): string {
   const month = MONTHS[run.month - 1];
   const year = run.year;
+  const earningsRows = [
+    `<tr><td>Base Salary</td><td style="text-align:right">${formatCurrency(detail.baseSalary)}</td></tr>`,
+    detail.overtimePay > 0 ? `<tr><td>Overtime (${(detail.overtimeMinutes / 60).toFixed(1)}h × ${detail.overtimeMultiplier}x)</td><td style="text-align:right">${formatCurrency(detail.overtimePay)}</td></tr>` : "",
+    detail.weeklyOffPay > 0 ? `<tr><td>Weekly Off Pay (${detail.weeklyOffWorkedDays} day${detail.weeklyOffWorkedDays > 1 ? "s" : ""} worked × ${detail.weeklyOffMultiplier}x)</td><td style="text-align:right">${formatCurrency(detail.weeklyOffPay)}</td></tr>` : "",
+    detail.holidayOtPay > 0 ? `<tr><td>Holiday OT (${detail.holidayWorkedDays} day${detail.holidayWorkedDays > 1 ? "s" : ""} worked × ${detail.holidayOtMultiplier}x)</td><td style="text-align:right">${formatCurrency(detail.holidayOtPay)}</td></tr>` : "",
+    detail.leaveEncashmentAmount > 0 ? `<tr><td>Leave Encashment (${detail.leaveEncashmentDays} day${detail.leaveEncashmentDays > 1 ? "s" : ""})</td><td style="text-align:right">${formatCurrency(detail.leaveEncashmentAmount)}</td></tr>` : "",
+    `<tr class="total-row"><td>Gross Salary</td><td style="text-align:right">${formatCurrency(detail.grossSalary)}</td></tr>`,
+  ].join("");
+
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -43,9 +74,7 @@ function generatePayslipHTML(detail: PayrollDetail, run: PayrollRun, companyName
   th { background: #444ce7; color: #fff; padding: 8px 12px; text-align: left; font-size: 11px; font-weight: 600; letter-spacing: 0.4px; }
   td { padding: 7px 12px; border-bottom: 1px solid #f0f0f0; font-size: 12px; }
   tr:nth-child(even) td { background: #fafafa; }
-  .amount-row td { font-weight: 600; }
-  .total-row { background: #f0f2ff !important; }
-  .total-row td { font-weight: 700; font-size: 13px; color: #444ce7; border-top: 2px solid #444ce7; }
+  .total-row td { font-weight: 700; font-size: 13px; color: #444ce7; border-top: 2px solid #444ce7; background: #f0f2ff !important; }
   .net-box { background: #444ce7; color: #fff; border-radius: 8px; padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
   .net-box .label { font-size: 13px; opacity: 0.85; }
   .net-box .value { font-size: 22px; font-weight: 800; }
@@ -64,7 +93,7 @@ function generatePayslipHTML(detail: PayrollDetail, run: PayrollRun, companyName
   </div>
   <div class="slip-title">
     <h2>SALARY PAYSLIP</h2>
-    <p>${month} ${year} &nbsp;|&nbsp; ${run.runReference}</p>
+    <p>${month} ${year} &nbsp;|&nbsp; ${run.runReference} (v${detail.calculationVersion})</p>
     <p style="margin-top:6px"><span class="status-pill">${detail.paymentStatus}</span></p>
   </div>
 </div>
@@ -74,30 +103,27 @@ function generatePayslipHTML(detail: PayrollDetail, run: PayrollRun, companyName
   <div class="info-item"><label>Employee Code</label><span>${detail.employeeCode}</span></div>
   <div class="info-item"><label>Pay Period</label><span>${month} ${year} (${formatDate(run.periodStart)} – ${formatDate(run.periodEnd)})</span></div>
   <div class="info-item"><label>Working Days</label><span>${detail.standardWorkDays} days / ${detail.standardWorkHours} hrs per day</span></div>
+  <div class="info-item"><label>Present / Weekly-Off / Holiday</label><span>${detail.presentDays}d / ${detail.weeklyOffDays}d / ${detail.holidayDays}d</span></div>
+  <div class="info-item"><label>Paid Leave / Absent</label><span>${detail.paidLeaveDays}d / ${detail.absentDays}d</span></div>
   ${detail.paidDate ? `<div class="info-item"><label>Payment Date</label><span>${formatDate(detail.paidDate)}</span></div>` : ""}
   ${detail.paymentMode ? `<div class="info-item"><label>Payment Mode</label><span>${detail.paymentMode}</span></div>` : ""}
 </div>
 
-${detail.salaryCapped ? `<div class="capped-warn">⚠️ Salary was capped at ₹0 — deductions exceeded gross salary. Outstanding loan balance will carry forward.</div>` : ""}
+${detail.salaryCapped ? `<div class="capped-warn">⚠️ Salary was capped at ₹0 — deductions exceeded net salary. Outstanding loan balance will carry forward.</div>` : ""}
 
 <table>
   <thead><tr><th>Earnings</th><th style="text-align:right">Amount (₹)</th></tr></thead>
-  <tbody>
-    <tr><td>Base Salary</td><td style="text-align:right">${formatCurrency(detail.baseSalary)}</td></tr>
-    <tr class="amount-row"><td>Attendance Pay (${Math.floor(detail.workedMinutes / 60)}h ${detail.workedMinutes % 60}m worked)</td><td style="text-align:right">${formatCurrency(detail.grossSalary - (detail.overtimeMinutes > 0 ? Number(((detail.hourlyRate * detail.overtimeMultiplier * detail.overtimeMinutes) / 60).toFixed(2)) : 0) - (detail.paidLeaveDays > 0 ? Number((detail.hourlyRate * detail.standardWorkHours * detail.paidLeaveDays).toFixed(2)) : 0))}</td></tr>
-    ${detail.paidLeaveDays > 0 ? `<tr><td>Paid Leave Pay (${detail.paidLeaveDays} day${detail.paidLeaveDays > 1 ? "s" : ""})</td><td style="text-align:right">${formatCurrency(detail.hourlyRate * detail.standardWorkHours * detail.paidLeaveDays)}</td></tr>` : ""}
-    ${detail.overtimeMinutes > 0 ? `<tr><td>Overtime Pay (${Math.floor(detail.overtimeMinutes / 60)}h ${detail.overtimeMinutes % 60}m × ${detail.overtimeMultiplier}x)</td><td style="text-align:right">${formatCurrency((detail.hourlyRate * detail.overtimeMultiplier * detail.overtimeMinutes) / 60)}</td></tr>` : ""}
-    <tr class="total-row"><td>Gross Salary</td><td style="text-align:right">${formatCurrency(detail.grossSalary)}</td></tr>
-  </tbody>
+  <tbody>${earningsRows}</tbody>
 </table>
 
 <table>
   <thead><tr><th>Deductions</th><th style="text-align:right">Amount (₹)</th></tr></thead>
   <tbody>
+    ${detail.lossOfPayAmount > 0 ? `<tr><td>Loss of Pay (${detail.absentDays} day${detail.absentDays > 1 ? "s" : ""})</td><td style="text-align:right">- ${formatCurrency(detail.lossOfPayAmount)}</td></tr>` : ""}
     ${detail.loanPrincipalDeduction > 0 ? `<tr><td>Loan Principal Deduction</td><td style="text-align:right">- ${formatCurrency(detail.loanPrincipalDeduction)}</td></tr>` : ""}
     ${detail.loanInterestDeduction > 0 ? `<tr><td>Loan Interest Deduction</td><td style="text-align:right">- ${formatCurrency(detail.loanInterestDeduction)}</td></tr>` : ""}
-    ${detail.totalDeductions === 0 ? `<tr><td style="color:#888">No deductions</td><td style="text-align:right">—</td></tr>` : ""}
-    <tr class="total-row"><td>Total Deductions</td><td style="text-align:right">- ${formatCurrency(detail.totalDeductions)}</td></tr>
+    ${detail.totalDeductions === 0 && detail.lossOfPayAmount === 0 ? `<tr><td style="color:#888">No deductions</td><td style="text-align:right">—</td></tr>` : ""}
+    <tr class="total-row"><td>Total Deductions</td><td style="text-align:right">- ${formatCurrency(detail.totalDeductions + detail.lossOfPayAmount)}</td></tr>
   </tbody>
 </table>
 
@@ -179,7 +205,6 @@ function DisburseModal({ isOpen, onClose, onConfirm, loading, title, totalAmount
             <p className="text-2xl font-bold text-brand-700 dark:text-brand-300">{formatCurrency(totalAmount)}</p>
           </div>
         )}
-
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Payment Mode *</label>
           <div className="grid grid-cols-2 gap-3">
@@ -203,17 +228,265 @@ function DisburseModal({ isOpen, onClose, onConfirm, loading, title, totalAmount
             </button>
           </div>
         </div>
-
         <Input label="Remarks" value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="Optional payment remarks" />
-
         <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 flex gap-2 items-start">
           <AlertTriangle size={14} className="text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
           <p className="text-xs text-amber-700 dark:text-amber-300">
-            This action will mark the salary as <strong>PAID</strong> and automatically post a cashbook debit entry. This cannot be undone.
+            This action will mark the salary as <strong>PAID</strong> and automatically post a cashbook debit entry.
           </p>
         </div>
       </div>
     </Modal>
+  );
+}
+
+// ── Reopen Modal (reason required) ────────────────────────────────────────────
+function ReopenModal({ isOpen, onClose, onConfirm, loading }: { isOpen: boolean; onClose: () => void; onConfirm: (req: ReopenPayrollRequest) => void; loading: boolean }) {
+  const [reason, setReason] = useState("");
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Reopen Payroll Run"
+      size="sm"
+      footer={
+        <>
+          <Button variant="outline" onClick={onClose} disabled={loading}>
+            Cancel
+          </Button>
+          <Button variant="danger" loading={loading} disabled={!reason.trim()} icon={<Unlock size={14} />} onClick={() => onConfirm({ reason })}>
+            Reopen
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 flex gap-2 items-start">
+          <AlertTriangle size={14} className="text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-700 dark:text-amber-300">
+            Reopening unlocks attendance for this period and creates a <strong>new calculation version</strong>. The current version is preserved for audit.
+          </p>
+        </div>
+        <Textarea label="Reason for reopening *" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Attendance correction needed for 3 employees" rows={3} />
+      </div>
+    </Modal>
+  );
+}
+
+// ── Calculation Breakdown Modal ────────────────────────────────────────────────
+function BreakdownModal({ isOpen, onClose, log, loading }: { isOpen: boolean; onClose: () => void; log: PayrollCalculationLog | null; loading: boolean }) {
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={log ? `Calculation Breakdown — ${log.employeeName}` : "Calculation Breakdown"}
+      size="md"
+      footer={
+        <Button variant="outline" onClick={onClose}>
+          Close
+        </Button>
+      }
+    >
+      {loading ? (
+        <div className="py-8 text-center text-sm text-gray-400">Loading…</div>
+      ) : !log ? (
+        <div className="py-8 text-center text-sm text-gray-400">No calculation log found.</div>
+      ) : (
+        <div className="space-y-3">
+          <p className="text-xs text-gray-400">
+            Version {log.calculationVersion} · Calculated by {log.calculatedBy} on {formatDateTime(log.calculatedDate)}
+          </p>
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700/60 overflow-hidden">
+            {log.breakdown.map((line, i) => (
+              <div key={i} className={cn("px-4 py-2.5 text-sm font-mono", i === log.breakdown.length - 1 ? "bg-emerald-50 dark:bg-emerald-950/30 font-bold text-emerald-700 dark:text-emerald-300" : "text-gray-700 dark:text-gray-300")}>
+                {line}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+// ── Version History Modal ──────────────────────────────────────────────────────
+function VersionHistoryModal({ isOpen, onClose, versions, loading, currentRunId, onSelect }: { isOpen: boolean; onClose: () => void; versions: PayrollRun[]; loading: boolean; currentRunId?: number; onSelect: (r: PayrollRun) => void }) {
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Payroll Version History"
+      size="lg"
+      footer={
+        <Button variant="outline" onClick={onClose}>
+          Close
+        </Button>
+      }
+    >
+      {loading ? (
+        <div className="py-8 text-center text-sm text-gray-400">Loading…</div>
+      ) : versions.length === 0 ? (
+        <div className="py-8 text-center text-sm text-gray-400">No history found.</div>
+      ) : (
+        <div className="space-y-2">
+          {versions.map((v) => (
+            <button
+              key={v.id}
+              onClick={() => {
+                onSelect(v);
+                onClose();
+              }}
+              className={cn("w-full flex items-center justify-between p-3 rounded-xl border text-left transition-colors", v.id === currentRunId ? "border-brand-500 bg-brand-50 dark:bg-brand-950/30" : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/60")}
+            >
+              <div className="flex items-center gap-3">
+                <span className="font-mono text-xs font-bold text-gray-500">v{v.calculationVersion}</span>
+                <div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">{v.runReference}</p>
+                  <p className="text-xs text-gray-400">
+                    {v.generatedBy} · {formatDateTime(v.generatedDate)}
+                    {v.reopenReason && <> · Reopened: {v.reopenReason}</>}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {v.isCurrentVersion && <Badge variant="success">Current</Badge>}
+                <Badge variant={payrollStatusVariant(v.status)}>{v.status}</Badge>
+                <ChevronRight size={14} className="text-gray-400" />
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+// ── Exception Report Modal (pre-approval scan) ─────────────────────────────────
+function ExceptionReportModal({
+  isOpen,
+  onClose,
+  year,
+  month,
+  setYear,
+  setMonth,
+  exceptions,
+  loading,
+  onScan,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  year: number;
+  month: number;
+  setYear: (y: number) => void;
+  setMonth: (m: number) => void;
+  exceptions: import("@/types").PayrollException[];
+  loading: boolean;
+  onScan: () => void;
+}) {
+  const yOpts = [currentYear() - 1, currentYear()].map((y) => ({ value: String(y), label: String(y) }));
+  const mOpts = MONTHS.map((m, i) => ({ value: String(i + 1), label: m }));
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Payroll Exception Report"
+      size="lg"
+      footer={
+        <Button variant="outline" onClick={onClose}>
+          Close
+        </Button>
+      }
+    >
+      <div className="space-y-4">
+        <div className="flex items-end gap-3">
+          <div className="w-32">
+            <Select label="Year" value={String(year)} onChange={(e) => setYear(Number(e.target.value))} options={yOpts} />
+          </div>
+          <div className="flex-1">
+            <Select label="Month" value={String(month)} onChange={(e) => setMonth(Number(e.target.value))} options={mOpts} />
+          </div>
+          <Button icon={<Search size={14} />} loading={loading} onClick={onScan}>
+            Scan
+          </Button>
+        </div>
+
+        {exceptions.length === 0 ? (
+          <div className="p-6 text-center rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
+            <ShieldCheck className="mx-auto mb-2 text-emerald-600" size={24} />
+            <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">No exceptions found for this period — clear to approve.</p>
+          </div>
+        ) : (
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {exceptions.map((ex) => (
+              <div key={ex.employeeId} className="p-3 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30">
+                <div className="flex justify-between items-start mb-1.5">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{ex.employeeName}</p>
+                    <p className="text-xs font-mono text-gray-400">{ex.employeeCode}</p>
+                  </div>
+                  <span className="text-xs text-gray-400">{ex.affectedDates.length} date(s)</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {ex.issues.map((issue) => (
+                    <Badge key={issue} variant="warning">
+                      {issue.replace(/_/g, " ")}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+// ── Metrics + Generation-exception banner (shown right after generate/recalculate/reopen) ──
+function RunActionSummary({ run }: { run: PayrollRun }) {
+  if (!run.metrics && (!run.generationExceptions || run.generationExceptions.length === 0)) return null;
+  return (
+    <div className="mb-5 space-y-3">
+      {run.metrics && (
+        <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+          <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-2 uppercase tracking-wide">Last Computation Summary</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+            <div>
+              <p className="text-gray-400 text-xs">Processed</p>
+              <p className="font-bold">{run.metrics.employeesProcessed}</p>
+            </div>
+            <div>
+              <p className="text-gray-400 text-xs">Skipped</p>
+              <p className={cn("font-bold", run.metrics.employeesSkipped > 0 ? "text-amber-600" : "")}>{run.metrics.employeesSkipped}</p>
+            </div>
+            <div>
+              <p className="text-gray-400 text-xs">Duration</p>
+              <p className="font-bold">{run.metrics.executionDurationMillis}ms</p>
+            </div>
+            <div>
+              <p className="text-gray-400 text-xs">Total Payroll</p>
+              <p className="font-bold">{formatCurrency(run.metrics.totalPayroll)}</p>
+            </div>
+          </div>
+        </div>
+      )}
+      {run.generationExceptions && run.generationExceptions.length > 0 && (
+        <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
+          <p className="text-xs font-semibold text-red-700 dark:text-red-300 mb-2 uppercase tracking-wide flex items-center gap-1.5">
+            <AlertTriangle size={13} /> {run.generationExceptions.length} employee(s) skipped
+          </p>
+          <div className="space-y-1.5">
+            {run.generationExceptions.map((ge) => (
+              <div key={ge.employeeId} className="text-xs text-red-700 dark:text-red-300 flex gap-2">
+                <span className="font-semibold">{ge.employeeName}</span>
+                <Badge variant="danger">{ge.reason}</Badge>
+                <span className="text-red-500">{ge.message}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -228,11 +501,20 @@ export default function PayrollPage() {
   const [genMonth, setGenMonth] = useState(currentMonth() - 1 || 12);
   const [genRemarks, setGenRemarks] = useState("");
 
-  // Disbursement state
-  const [disburseOne, setDisburseOne] = useState<PayrollDetail | null>(null);
-  const [disburseAll, setDisburseAll] = useState(false);
+  const [disburseOneTarget, setDisburseOneTarget] = useState<PayrollDetail | null>(null);
+  const [disburseAllOpen, setDisburseAllOpen] = useState(false);
   const [lockConfirm, setLockConfirm] = useState(false);
+  const [verifyConfirm, setVerifyConfirm] = useState(false);
+  const [approveConfirm, setApproveConfirm] = useState(false);
+  const [reopenOpen, setReopenOpen] = useState(false);
   const [payslipView, setPayslipView] = useState<PayrollDetail | null>(null);
+  const [breakdownEmployeeId, setBreakdownEmployeeId] = useState<number | null>(null);
+  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
+
+  const [exceptionModalOpen, setExceptionModalOpen] = useState(false);
+  const [excYear, setExcYear] = useState(currentYear());
+  const [excMonth, setExcMonth] = useState(currentMonth() - 1 || 12);
+  const [exceptions, setExceptions] = useState<import("@/types").PayrollException[]>([]);
 
   // ── Queries ────────────────────────────────────────────────────────────────
   const { data: runsData, isLoading: runsLoading } = useQuery({
@@ -246,11 +528,39 @@ export default function PayrollPage() {
     enabled: !!selectedRun,
   });
 
+  const { data: dashboardData } = useQuery({
+    queryKey: ["payroll-dashboard", selectedRun?.id],
+    queryFn: () => payrollApi.getDashboard(selectedRun!.id),
+    enabled: !!selectedRun,
+  });
+
+  const { data: versionsData, isLoading: versionsLoading } = useQuery({
+    queryKey: ["payroll-versions", selectedRun?.year, selectedRun?.month],
+    queryFn: () => payrollApi.getVersionHistory(selectedRun!.year, selectedRun!.month),
+    enabled: versionHistoryOpen && !!selectedRun,
+  });
+
+  const { data: calcLogsData, isLoading: calcLogsLoading } = useQuery({
+    queryKey: ["payroll-calc-logs", selectedRun?.id],
+    queryFn: () => payrollApi.getCalculationLogs(selectedRun!.id),
+    enabled: !!selectedRun && breakdownEmployeeId !== null,
+  });
+
   const runs: PayrollRun[] = runsData?.data?.data ?? [];
   const details: PayrollDetail[] = detailsData?.data?.data ?? [];
+  const dashboard = dashboardData?.data?.data;
+  const versions: PayrollRun[] = versionsData?.data?.data ?? [];
+  const activeBreakdownLog = (calcLogsData?.data?.data ?? []).find((l) => l.employeeId === breakdownEmployeeId) ?? null;
+
   const pendingCount = details.filter((d) => d.paymentStatus === "PENDING").length;
   const paidCount = details.filter((d) => d.paymentStatus === "PAID").length;
   const totalPending = details.filter((d) => d.paymentStatus === "PENDING").reduce((s, d) => s + d.netSalary, 0);
+
+  const refreshRun = () => {
+    qc.invalidateQueries({ queryKey: ["payroll-runs"] });
+    qc.invalidateQueries({ queryKey: ["payroll-details", selectedRun?.id] });
+    qc.invalidateQueries({ queryKey: ["payroll-dashboard", selectedRun?.id] });
+  };
 
   // ── Mutations ──────────────────────────────────────────────────────────────
   const generateM = useMutation({
@@ -258,28 +568,62 @@ export default function PayrollPage() {
     onSuccess: (res) => {
       toast.success(`Payroll ${res.data.data.runReference} generated`);
       qc.invalidateQueries({ queryKey: ["payroll-runs"] });
+      setSelectedRun(res.data.data);
       setShowGenerate(false);
       setGenRemarks("");
     },
     onError: (e: any) => toast.error(e?.response?.data?.message ?? "Generation failed"),
   });
 
-  const regenerateM = useMutation({
-    mutationFn: (runId: number) => payrollApi.regenerate(runId),
-    onSuccess: () => {
-      toast.success("Payroll regenerated");
-      qc.invalidateQueries({ queryKey: ["payroll-runs"] });
-      qc.invalidateQueries({ queryKey: ["payroll-details", selectedRun?.id] });
+  const recalculateM = useMutation({
+    mutationFn: (runId: number) => payrollApi.recalculate(runId),
+    onSuccess: (res) => {
+      toast.success(`Recalculated as version ${res.data.data.calculationVersion}`);
+      setSelectedRun(res.data.data);
+      refreshRun();
     },
-    onError: (e: any) => toast.error(e?.response?.data?.message ?? "Regeneration failed"),
+    onError: (e: any) => toast.error(e?.response?.data?.message ?? "Recalculation failed"),
+  });
+
+  const verifyM = useMutation({
+    mutationFn: (req: ActionRemarksRequest) => payrollApi.verify(selectedRun!.id, req),
+    onSuccess: (res) => {
+      toast.success("Payroll verified");
+      setSelectedRun(res.data.data);
+      refreshRun();
+      setVerifyConfirm(false);
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.message ?? "Verify failed"),
+  });
+
+  const approveM = useMutation({
+    mutationFn: (req: ActionRemarksRequest) => payrollApi.approve(selectedRun!.id, req),
+    onSuccess: (res) => {
+      toast.success("Payroll approved — attendance for this period is now locked");
+      setSelectedRun(res.data.data);
+      refreshRun();
+      setApproveConfirm(false);
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.message ?? "Approve failed"),
+  });
+
+  const reopenM = useMutation({
+    mutationFn: (req: ReopenPayrollRequest) => payrollApi.reopen(selectedRun!.id, req),
+    onSuccess: (res) => {
+      toast.success(`Reopened as version ${res.data.data.calculationVersion} — attendance unlocked`);
+      setSelectedRun(res.data.data);
+      refreshRun();
+      setReopenOpen(false);
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.message ?? "Reopen failed"),
   });
 
   const disburseOneM = useMutation({
     mutationFn: ({ id, req }: { id: number; req: DisburseRequest }) => payrollApi.disburseOne(id, req),
     onSuccess: () => {
       toast.success("Salary disbursed and cashbook updated");
-      qc.invalidateQueries({ queryKey: ["payroll-details", selectedRun?.id] });
-      setDisburseOne(null);
+      refreshRun();
+      setDisburseOneTarget(null);
     },
     onError: (e: any) => toast.error(e?.response?.data?.message ?? "Disbursement failed"),
   });
@@ -288,22 +632,31 @@ export default function PayrollPage() {
     mutationFn: ({ runId, req }: { runId: number; req: DisburseRequest }) => payrollApi.disburseAll(runId, req),
     onSuccess: () => {
       toast.success(`All ${pendingCount} salaries disbursed`);
-      qc.invalidateQueries({ queryKey: ["payroll-details", selectedRun?.id] });
-      setDisburseAll(false);
+      refreshRun();
+      setDisburseAllOpen(false);
     },
     onError: (e: any) => toast.error(e?.response?.data?.message ?? "Disbursement failed"),
   });
 
   const lockM = useMutation({
     mutationFn: (runId: number) => payrollApi.lockRun(runId),
-    onSuccess: () => {
+    onSuccess: (res) => {
       toast.success("Payroll run locked");
-      qc.invalidateQueries({ queryKey: ["payroll-runs"] });
-      qc.invalidateQueries({ queryKey: ["payroll-details", selectedRun?.id] });
+      setSelectedRun(res.data.data);
+      refreshRun();
       setLockConfirm(false);
     },
     onError: (e: any) => toast.error(e?.response?.data?.message ?? "Lock failed"),
   });
+
+  const scanExceptions = async () => {
+    try {
+      const res = await payrollApi.getExceptionReport(excYear, excMonth);
+      setExceptions(res.data.data);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message ?? "Scan failed");
+    }
+  };
 
   // ── Run list columns ───────────────────────────────────────────────────────
   const runColumns: Column<PayrollRun>[] = [
@@ -311,8 +664,9 @@ export default function PayrollPage() {
       key: "ref",
       header: "Reference",
       render: (r) => (
-        <button onClick={() => setSelectedRun(r)} className="font-mono text-xs font-bold text-brand-600 dark:text-brand-400 hover:underline">
+        <button onClick={() => setSelectedRun(r)} className="font-mono text-xs font-bold text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1.5">
           {r.runReference}
+          <span className="text-gray-400 font-normal">v{r.calculationVersion}</span>
         </button>
       ),
     },
@@ -320,11 +674,7 @@ export default function PayrollPage() {
     { key: "emps", header: "Employees", render: (r) => r.totalEmployees ?? "—", className: "text-center" },
     { key: "gross", header: "Total Gross", render: (r) => (r.totalGross ? formatCurrency(r.totalGross) : "—") },
     { key: "net", header: "Total Net", render: (r) => (r.totalNet ? <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(r.totalNet)}</span> : "—") },
-    {
-      key: "status",
-      header: "Status",
-      render: (r) => <Badge variant={r.status === "LOCKED" ? "neutral" : r.status === "GENERATED" ? "info" : "warning"}>{r.status}</Badge>,
-    },
+    { key: "status", header: "Status", render: (r) => <Badge variant={payrollStatusVariant(r.status)}>{r.status}</Badge> },
     {
       key: "genBy",
       header: "Generated By",
@@ -343,9 +693,9 @@ export default function PayrollPage() {
           <Button size="sm" variant="ghost" icon={<Eye size={13} />} onClick={() => setSelectedRun(r)}>
             Details
           </Button>
-          {r.status !== "LOCKED" && (
-            <Button size="sm" variant="ghost" icon={<RefreshCw size={13} />} loading={regenerateM.isPending} onClick={() => regenerateM.mutate(r.id)}>
-              Regen
+          {r.status === "CALCULATED" && (
+            <Button size="sm" variant="ghost" icon={<RefreshCw size={13} />} loading={recalculateM.isPending} onClick={() => recalculateM.mutate(r.id)}>
+              Recalc
             </Button>
           )}
         </div>
@@ -365,23 +715,23 @@ export default function PayrollPage() {
         </div>
       ),
     },
-    { key: "base", header: "Base", render: (d) => formatCurrency(d.baseSalary) },
+    {
+      key: "days",
+      header: "P / WO / H / L / A",
+      render: (d) => (
+        <span className="text-xs font-mono text-gray-500">
+          {d.presentDays}/{d.weeklyOffDays}/{d.holidayDays}/{d.paidLeaveDays}/{d.absentDays}
+        </span>
+      ),
+    },
     { key: "gross", header: "Gross", render: (d) => formatCurrency(d.grossSalary) },
     {
       key: "ded",
       header: "Deductions",
-      render: (d) => (d.totalDeductions > 0 ? <span className="text-red-500 font-medium">-{formatCurrency(d.totalDeductions)}</span> : <span className="text-gray-400">—</span>),
+      render: (d) => (d.totalDeductions + d.lossOfPayAmount > 0 ? <span className="text-red-500 font-medium">-{formatCurrency(d.totalDeductions + d.lossOfPayAmount)}</span> : <span className="text-gray-400">—</span>),
     },
-    {
-      key: "net",
-      header: "Net Salary",
-      render: (d) => <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(d.netSalary)}</span>,
-    },
-    {
-      key: "capped",
-      header: "Capped",
-      render: (d) => (d.salaryCapped ? <Badge variant="warning">Yes</Badge> : <Badge variant="neutral">No</Badge>),
-    },
+    { key: "net", header: "Net Salary", render: (d) => <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(d.netSalary)}</span> },
+    { key: "capped", header: "Capped", render: (d) => (d.salaryCapped ? <Badge variant="warning">Yes</Badge> : <Badge variant="neutral">No</Badge>) },
     {
       key: "status",
       header: "Payment",
@@ -401,18 +751,14 @@ export default function PayrollPage() {
       header: "Actions",
       render: (d) => (
         <div className="flex gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            icon={<Printer size={13} />}
-            onClick={() => {
-              setPayslipView(d);
-            }}
-          >
+          <Button size="sm" variant="ghost" icon={<FileText size={13} />} onClick={() => setBreakdownEmployeeId(d.employeeId)}>
+            Breakdown
+          </Button>
+          <Button size="sm" variant="ghost" icon={<Printer size={13} />} onClick={() => setPayslipView(d)}>
             Payslip
           </Button>
-          {d.paymentStatus === "PENDING" && selectedRun?.status !== "LOCKED" && (
-            <Button size="sm" variant="ghost" icon={<IndianRupee size={13} />} className="text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30" onClick={() => setDisburseOne(d)}>
+          {d.paymentStatus === "PENDING" && (selectedRun?.status === "APPROVED" || selectedRun?.status === "PROCESSED") && (
+            <Button size="sm" variant="ghost" icon={<IndianRupee size={13} />} className="text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30" onClick={() => setDisburseOneTarget(d)}>
               Pay
             </Button>
           )}
@@ -428,12 +774,17 @@ export default function PayrollPage() {
     <div>
       <PageHeader
         title="Payroll"
-        subtitle="Generate, disburse and lock monthly payroll"
+        subtitle="Generate, verify, approve and disburse monthly payroll"
         icon={<DollarSign size={20} />}
         actions={
-          <Button icon={<Play size={15} />} onClick={() => setShowGenerate(true)}>
-            Generate Payroll
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" icon={<ListChecks size={15} />} onClick={() => setExceptionModalOpen(true)}>
+              Check Exceptions
+            </Button>
+            <Button icon={<Play size={15} />} onClick={() => setShowGenerate(true)}>
+              Generate Payroll
+            </Button>
+          </div>
         }
       />
 
@@ -456,46 +807,97 @@ export default function PayrollPage() {
         {selectedRun && (
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
             {/* Back + header */}
-            <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
               <div className="flex items-center gap-3">
                 <Button variant="outline" size="sm" onClick={() => setSelectedRun(null)}>
                   ← All Runs
                 </Button>
                 <div>
-                  <h2 className="text-base font-bold text-gray-900 dark:text-white">
+                  <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
                     {selectedRun.runReference} — {MONTHS[selectedRun.month - 1]} {selectedRun.year}
+                    <span className="text-xs font-normal text-gray-400">v{selectedRun.calculationVersion}</span>
+                    {!selectedRun.isCurrentVersion && <Badge variant="neutral">Historical</Badge>}
                   </h2>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-gray-400 flex items-center gap-2 mt-0.5">
                     {formatDate(selectedRun.periodStart)} to {formatDate(selectedRun.periodEnd)}
-                    &nbsp;·&nbsp;
-                    <Badge variant={selectedRun.status === "LOCKED" ? "neutral" : "info"} className="ml-1">
-                      {selectedRun.status}
-                    </Badge>
+                    <Badge variant={payrollStatusVariant(selectedRun.status)}>{selectedRun.status}</Badge>
+                    <button onClick={() => setVersionHistoryOpen(true)} className="inline-flex items-center gap-1 text-brand-600 dark:text-brand-400 hover:underline">
+                      <History size={12} /> Version history
+                    </button>
                   </p>
                 </div>
               </div>
-              {/* Action buttons */}
-              <div className="flex gap-2">
-                {selectedRun.status !== "LOCKED" && pendingCount > 0 && (
-                  <Button variant="primary" icon={<IndianRupee size={15} />} onClick={() => setDisburseAll(true)}>
-                    Pay All ({pendingCount})
-                  </Button>
+
+              {/* Lifecycle action bar */}
+              <div className="flex gap-2 flex-wrap">
+                {selectedRun.status === "CALCULATED" && (
+                  <>
+                    <Button variant="outline" icon={<RefreshCw size={15} />} loading={recalculateM.isPending} onClick={() => recalculateM.mutate(selectedRun.id)}>
+                      Recalculate
+                    </Button>
+                    <Button variant="primary" icon={<CheckCircle2 size={15} />} onClick={() => setVerifyConfirm(true)}>
+                      Verify
+                    </Button>
+                  </>
                 )}
-                {selectedRun.status !== "LOCKED" && pendingCount === 0 && paidCount > 0 && (
+                {selectedRun.status === "VERIFIED" && (
+                  <>
+                    <Button variant="outline" icon={<Unlock size={15} />} onClick={() => setReopenOpen(true)}>
+                      Reopen
+                    </Button>
+                    <Button variant="primary" icon={<ShieldCheck size={15} />} onClick={() => setApproveConfirm(true)}>
+                      Approve
+                    </Button>
+                  </>
+                )}
+                {selectedRun.status === "APPROVED" && (
+                  <>
+                    <Button variant="outline" icon={<Unlock size={15} />} onClick={() => setReopenOpen(true)}>
+                      Reopen
+                    </Button>
+                    {pendingCount > 0 && (
+                      <Button variant="primary" icon={<IndianRupee size={15} />} onClick={() => setDisburseAllOpen(true)}>
+                        Pay All ({pendingCount})
+                      </Button>
+                    )}
+                  </>
+                )}
+                {selectedRun.status === "PROCESSED" && (
+                  <>
+                    <Button variant="outline" icon={<Unlock size={15} />} onClick={() => setReopenOpen(true)}>
+                      Reopen
+                    </Button>
+                    {pendingCount > 0 && (
+                      <Button variant="primary" icon={<IndianRupee size={15} />} onClick={() => setDisburseAllOpen(true)}>
+                        Pay All ({pendingCount})
+                      </Button>
+                    )}
+                  </>
+                )}
+                {selectedRun.status === "PAID" && (
                   <Button variant="secondary" icon={<Lock size={15} />} onClick={() => setLockConfirm(true)}>
                     Lock Run
                   </Button>
                 )}
+                {selectedRun.status === "LOCKED" && <Badge variant="neutral">Permanently Locked</Badge>}
               </div>
             </div>
 
-            {/* Payment stats */}
-            <div className="grid grid-cols-4 gap-4 mb-5">
-              <KPICard title="Total Employees" value={details.length} icon={<Users size={18} />} color="blue" index={0} />
-              <KPICard title="Paid" value={paidCount} icon={<CheckCircle2 size={18} />} color="green" index={1} />
-              <KPICard title="Pending" value={pendingCount} icon={<AlertTriangle size={18} />} color="orange" index={2} />
-              <KPICard title="Pending Amount" value={formatCurrency(totalPending)} icon={<IndianRupee size={18} />} color="red" index={3} />
-            </div>
+            <RunActionSummary run={selectedRun} />
+
+            {/* Dashboard KPIs */}
+            {dashboard && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
+                <KPICard title="Total Employees" value={dashboard.totalEmployees} icon={<Users size={18} />} color="blue" index={0} />
+                <KPICard title="Paid" value={dashboard.paidCount} icon={<CheckCircle2 size={18} />} color="green" index={1} />
+                <KPICard title="Pending" value={dashboard.pendingCount} icon={<AlertTriangle size={18} />} color="orange" index={2} />
+                <KPICard title="Pending Amount" value={formatCurrency(totalPending)} icon={<IndianRupee size={18} />} color="red" index={3} />
+                <KPICard title="Basic Salary" value={formatCurrency(dashboard.totalBasicSalary)} color="blue" index={4} />
+                <KPICard title="Overtime + Weekly-Off + Holiday" value={formatCurrency(dashboard.totalOvertime + dashboard.totalWeeklyOffAmount + dashboard.totalHolidayPay)} color="purple" index={5} />
+                <KPICard title="Leave Encashment" value={formatCurrency(dashboard.totalLeaveEncashment)} color="teal" index={6} />
+                <KPICard title="Loss of Pay" value={formatCurrency(dashboard.totalLossOfPay)} color="red" index={7} />
+              </div>
+            )}
 
             {/* Progress bar */}
             {details.length > 0 && (
@@ -535,20 +937,27 @@ export default function PayrollPage() {
         }
       >
         <div className="space-y-4">
-          <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 text-xs text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">Payroll should be generated after the month ends. Existing payroll for this period will be deleted and recalculated.</div>
+          <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 text-xs text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+            Payroll should be generated only after the month ends. This creates version 1 for the period — a settings snapshot is captured and reused for every future recalculation of this month.
+          </div>
           <Select label="Year *" value={String(genYear)} onChange={(e) => setGenYear(Number(e.target.value))} options={yOpts} />
           <Select label="Month *" value={String(genMonth)} onChange={(e) => setGenMonth(Number(e.target.value))} options={mOpts} />
           <Input label="Remarks" value={genRemarks} onChange={(e) => setGenRemarks(e.target.value)} placeholder="Optional" />
         </div>
       </Modal>
 
-      {/* ── Disburse Single ─────────────────────────────────────────────────── */}
-      <DisburseModal isOpen={!!disburseOne} onClose={() => setDisburseOne(null)} onConfirm={(req) => disburseOneM.mutate({ id: disburseOne!.id, req })} loading={disburseOneM.isPending} title={`Pay Salary — ${disburseOne?.employeeName}`} totalAmount={disburseOne?.netSalary} />
-
-      {/* ── Disburse All ────────────────────────────────────────────────────── */}
+      {/* ── Disburse Single / All ────────────────────────────────────────────── */}
       <DisburseModal
-        isOpen={disburseAll}
-        onClose={() => setDisburseAll(false)}
+        isOpen={!!disburseOneTarget}
+        onClose={() => setDisburseOneTarget(null)}
+        onConfirm={(req) => disburseOneM.mutate({ id: disburseOneTarget!.id, req })}
+        loading={disburseOneM.isPending}
+        title={`Pay Salary — ${disburseOneTarget?.employeeName}`}
+        totalAmount={disburseOneTarget?.netSalary}
+      />
+      <DisburseModal
+        isOpen={disburseAllOpen}
+        onClose={() => setDisburseAllOpen(false)}
         onConfirm={(req) => disburseAllM.mutate({ runId: selectedRun!.id, req })}
         loading={disburseAllM.isPending}
         title={`Pay All Salaries — ${MONTHS[selectedRun ? selectedRun.month - 1 : 0]} ${selectedRun?.year}`}
@@ -556,16 +965,46 @@ export default function PayrollPage() {
         employeeCount={pendingCount}
       />
 
-      {/* ── Lock Confirm ─────────────────────────────────────────────────────── */}
+      {/* ── Lifecycle confirm modals ─────────────────────────────────────────── */}
+      <ConfirmModal
+        isOpen={verifyConfirm}
+        onClose={() => setVerifyConfirm(false)}
+        onConfirm={() => verifyM.mutate({})}
+        title="Verify Payroll?"
+        message="Confirms the calculated numbers are correct. The run moves to VERIFIED and can then be approved."
+        confirmLabel="Verify"
+        variant="primary"
+        loading={verifyM.isPending}
+      />
+      <ConfirmModal
+        isOpen={approveConfirm}
+        onClose={() => setApproveConfirm(false)}
+        onConfirm={() => approveM.mutate({})}
+        title="Approve Payroll?"
+        message="Approves for disbursement and LOCKS attendance for this entire period. Attendance can only be edited again by reopening this run."
+        confirmLabel="Approve"
+        variant="primary"
+        loading={approveM.isPending}
+      />
       <ConfirmModal
         isOpen={lockConfirm}
         onClose={() => setLockConfirm(false)}
         onConfirm={() => lockM.mutate(selectedRun!.id)}
         title="Lock Payroll Run?"
-        message="This will permanently lock the payroll run. No further changes, disbursements or regeneration will be possible."
+        message="This will permanently lock the payroll run. No further changes, disbursements or reopening will be possible."
         confirmLabel="Lock Run"
         loading={lockM.isPending}
       />
+      <ReopenModal isOpen={reopenOpen} onClose={() => setReopenOpen(false)} onConfirm={(req) => reopenM.mutate(req)} loading={reopenM.isPending} />
+
+      {/* ── Version History ──────────────────────────────────────────────────── */}
+      <VersionHistoryModal isOpen={versionHistoryOpen} onClose={() => setVersionHistoryOpen(false)} versions={versions} loading={versionsLoading} currentRunId={selectedRun?.id} onSelect={(v) => setSelectedRun(v)} />
+
+      {/* ── Calculation Breakdown ────────────────────────────────────────────── */}
+      <BreakdownModal isOpen={breakdownEmployeeId !== null} onClose={() => setBreakdownEmployeeId(null)} log={activeBreakdownLog} loading={calcLogsLoading} />
+
+      {/* ── Exception Report ─────────────────────────────────────────────────── */}
+      <ExceptionReportModal isOpen={exceptionModalOpen} onClose={() => setExceptionModalOpen(false)} year={excYear} month={excMonth} setYear={setExcYear} setMonth={setExcMonth} exceptions={exceptions} loading={false} onScan={scanExceptions} />
 
       {/* ── Payslip Preview + Print Modal ──────────────────────────────────── */}
       <Modal
@@ -586,7 +1025,6 @@ export default function PayrollPage() {
       >
         {payslipView && selectedRun && (
           <div className="space-y-4 text-sm">
-            {/* Header */}
             <div className="flex justify-between items-start p-4 rounded-xl bg-brand-50 dark:bg-brand-950/30 border border-brand-200 dark:border-brand-800">
               <div>
                 <p className="font-bold text-lg text-gray-900 dark:text-white">{payslipView.employeeName}</p>
@@ -595,7 +1033,7 @@ export default function PayrollPage() {
               <div className="text-right">
                 <Badge variant={payslipView.paymentStatus === "PAID" ? "success" : "warning"}>{payslipView.paymentStatus}</Badge>
                 <p className="text-xs text-gray-400 mt-1">
-                  {MONTHS[selectedRun.month - 1]} {selectedRun.year}
+                  {MONTHS[selectedRun.month - 1]} {selectedRun.year} · v{payslipView.calculationVersion}
                 </p>
               </div>
             </div>
@@ -603,7 +1041,7 @@ export default function PayrollPage() {
             {payslipView.salaryCapped && (
               <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 flex gap-2 items-start">
                 <AlertTriangle size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-amber-700 dark:text-amber-300">Salary was capped — deductions exceeded gross. Balance carries forward.</p>
+                <p className="text-xs text-amber-700 dark:text-amber-300">Salary was capped — deductions exceeded net. Balance carries forward.</p>
               </div>
             )}
 
@@ -612,23 +1050,37 @@ export default function PayrollPage() {
               <div className="bg-gray-50 dark:bg-gray-800 px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Earnings</div>
               <div className="divide-y divide-gray-100 dark:divide-gray-700/60">
                 <div className="flex justify-between px-4 py-2.5">
-                  <span className="text-gray-600 dark:text-gray-400">Base Salary</span>
+                  <span className="text-gray-600 dark:text-gray-400">Base Salary ({payslipView.presentDays} present days)</span>
                   <span className="font-medium">{formatCurrency(payslipView.baseSalary)}</span>
                 </div>
-                {payslipView.paidLeaveDays > 0 && (
+                {payslipView.overtimePay > 0 && (
                   <div className="flex justify-between px-4 py-2.5">
                     <span className="text-gray-600 dark:text-gray-400">
-                      Paid Leave ({payslipView.paidLeaveDays} day{payslipView.paidLeaveDays > 1 ? "s" : ""})
+                      Overtime ({(payslipView.overtimeMinutes / 60).toFixed(1)}h × {payslipView.overtimeMultiplier}x)
                     </span>
-                    <span className="font-medium text-blue-600">included</span>
+                    <span className="font-medium text-brand-600">{formatCurrency(payslipView.overtimePay)}</span>
                   </div>
                 )}
-                {payslipView.overtimeMinutes > 0 && (
+                {payslipView.weeklyOffPay > 0 && (
                   <div className="flex justify-between px-4 py-2.5">
                     <span className="text-gray-600 dark:text-gray-400">
-                      Overtime ({Math.floor(payslipView.overtimeMinutes / 60)}h {payslipView.overtimeMinutes % 60}m × {payslipView.overtimeMultiplier}x)
+                      Weekly Off Pay ({payslipView.weeklyOffWorkedDays} day(s) worked × {payslipView.weeklyOffMultiplier}x)
                     </span>
-                    <span className="font-medium text-brand-600">included</span>
+                    <span className="font-medium text-blue-600">{formatCurrency(payslipView.weeklyOffPay)}</span>
+                  </div>
+                )}
+                {payslipView.holidayOtPay > 0 && (
+                  <div className="flex justify-between px-4 py-2.5">
+                    <span className="text-gray-600 dark:text-gray-400">
+                      Holiday OT ({payslipView.holidayWorkedDays} day(s) worked × {payslipView.holidayOtMultiplier}x)
+                    </span>
+                    <span className="font-medium text-purple-600">{formatCurrency(payslipView.holidayOtPay)}</span>
+                  </div>
+                )}
+                {payslipView.leaveEncashmentAmount > 0 && (
+                  <div className="flex justify-between px-4 py-2.5">
+                    <span className="text-gray-600 dark:text-gray-400">Leave Encashment ({payslipView.leaveEncashmentDays} day(s))</span>
+                    <span className="font-medium text-teal-600">{formatCurrency(payslipView.leaveEncashmentAmount)}</span>
                   </div>
                 )}
                 <div className="flex justify-between px-4 py-2.5 bg-gray-50 dark:bg-gray-800/60">
@@ -639,10 +1091,16 @@ export default function PayrollPage() {
             </div>
 
             {/* Deductions */}
-            {payslipView.totalDeductions > 0 && (
+            {(payslipView.totalDeductions > 0 || payslipView.lossOfPayAmount > 0) && (
               <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
                 <div className="bg-gray-50 dark:bg-gray-800 px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Deductions</div>
                 <div className="divide-y divide-gray-100 dark:divide-gray-700/60">
+                  {payslipView.lossOfPayAmount > 0 && (
+                    <div className="flex justify-between px-4 py-2.5">
+                      <span className="text-gray-600 dark:text-gray-400">Loss of Pay ({payslipView.absentDays} day(s))</span>
+                      <span className="text-red-500">-{formatCurrency(payslipView.lossOfPayAmount)}</span>
+                    </div>
+                  )}
                   {payslipView.loanPrincipalDeduction > 0 && (
                     <div className="flex justify-between px-4 py-2.5">
                       <span className="text-gray-600 dark:text-gray-400">Loan Principal</span>
@@ -657,7 +1115,7 @@ export default function PayrollPage() {
                   )}
                   <div className="flex justify-between px-4 py-2.5 bg-gray-50 dark:bg-gray-800/60">
                     <span className="font-semibold">Total Deductions</span>
-                    <span className="font-bold text-red-500">-{formatCurrency(payslipView.totalDeductions)}</span>
+                    <span className="font-bold text-red-500">-{formatCurrency(payslipView.totalDeductions + payslipView.lossOfPayAmount)}</span>
                   </div>
                 </div>
               </div>
@@ -687,29 +1145,38 @@ export default function PayrollPage() {
               </div>
             )}
 
-            {/* Worked hours */}
-            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800 text-xs text-gray-500 grid grid-cols-4 gap-2">
+            {/* Day breakdown */}
+            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800 text-xs text-gray-500 grid grid-cols-5 gap-2">
               <div>
-                <p className="font-medium text-gray-700 dark:text-gray-300">
-                  {Math.floor(payslipView.workedMinutes / 60)}h {payslipView.workedMinutes % 60}m
-                </p>
-                <p>Hours Worked</p>
+                <p className="font-medium text-gray-700 dark:text-gray-300">{payslipView.presentDays}d</p>
+                <p>Present</p>
+              </div>
+              <div>
+                <p className="font-medium text-gray-700 dark:text-gray-300">{payslipView.weeklyOffDays}d</p>
+                <p>Weekly Off</p>
+              </div>
+              <div>
+                <p className="font-medium text-gray-700 dark:text-gray-300">{payslipView.holidayDays}d</p>
+                <p>Holiday</p>
               </div>
               <div>
                 <p className="font-medium text-gray-700 dark:text-gray-300">{payslipView.paidLeaveDays}d</p>
                 <p>Paid Leave</p>
               </div>
               <div>
-                <p className="font-medium text-gray-700 dark:text-gray-300">
-                  {Math.floor(payslipView.overtimeMinutes / 60)}h {payslipView.overtimeMinutes % 60}m
-                </p>
-                <p>Overtime</p>
-              </div>
-              <div>
-                <p className="font-medium text-gray-700 dark:text-gray-300">{formatCurrency(payslipView.hourlyRate)}</p>
-                <p>Hourly Rate</p>
+                <p className="font-medium text-gray-700 dark:text-gray-300">{payslipView.absentDays}d</p>
+                <p>Absent</p>
               </div>
             </div>
+
+            <button
+              onClick={() => {
+                setBreakdownEmployeeId(payslipView.employeeId);
+              }}
+              className="text-xs text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1"
+            >
+              <FileText size={12} /> View full calculation breakdown
+            </button>
           </div>
         )}
       </Modal>

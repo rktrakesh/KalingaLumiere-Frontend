@@ -177,6 +177,33 @@ export interface LoanLedger {
   createdBy: string;
 }
 
+export type PayrollStatus = "DRAFT" | "CALCULATED" | "VERIFIED" | "APPROVED" | "PROCESSED" | "PAID" | "LOCKED";
+export type PaymentMode = "CASH" | "BANK";
+export type PayrollPaymentStatus = "PENDING" | "PAID";
+
+export interface PayrollMetrics {
+  employeesProcessed: number;
+  employeesSkipped: number;
+  executionDurationMillis: number;
+  totalPayroll: number;
+  totalOt: number;
+  totalHolidayOt: number;
+  totalWeeklyOffPay: number;
+  totalLeaveEncashment: number;
+  totalLossOfPay: number;
+  averageSalary: number;
+  averageOt: number;
+  averageLeaveDays: number;
+}
+
+export interface PayrollGenerationException {
+  employeeId: number;
+  employeeCode: string;
+  employeeName: string;
+  reason: "NO_SALARY" | "MISSING_ATTENDANCE" | "DUPLICATE_PAYROLL" | "INVALID_LEAVE" | "INVALID_SNAPSHOT" | "VALIDATION_FAILURE" | "UNKNOWN";
+  message: string;
+}
+
 export interface PayrollRun {
   id: number;
   runReference: string;
@@ -184,39 +211,154 @@ export interface PayrollRun {
   month: number;
   periodStart: string;
   periodEnd: string;
-  status: "GENERATED" | "REGENERATED" | "LOCKED";
+  status: PayrollStatus;
+
+  calculationVersion: number;
+  isCurrentVersion: boolean;
+  previousRunId?: number;
+
   totalEmployees?: number;
   totalGross?: number;
   totalNet?: number;
+
   generatedBy: string;
   generatedDate: string;
+  verifiedBy?: string;
+  verifiedDate?: string;
+  approvedBy?: string;
+  approvedDate?: string;
+  processedBy?: string;
+  processedDate?: string;
   lockedBy?: string;
   lockedDate?: string;
+  reopenedBy?: string;
+  reopenedDate?: string;
+  reopenReason?: string;
+
   remarks?: string;
+
+  /** Only populated on the response of generate / recalculate / reopen. */
+  metrics?: PayrollMetrics;
+  /** Employees skipped during that computation, with reasons. Empty array if none. */
+  generationExceptions?: PayrollGenerationException[];
 }
+
 export interface PayrollDetail {
   id: number;
   employeeId: number;
   employeeCode: string;
   employeeName: string;
+  calculationVersion: number;
+
   baseSalary: number;
   standardWorkDays: number;
   standardWorkHours: number;
   hourlyRate: number;
-  workedMinutes: number;
+
+  presentDays: number;
+  weeklyOffDays: number;
+  weeklyOffWorkedDays: number;
+  holidayDays: number;
+  holidayWorkedDays: number;
   paidLeaveDays: number;
+  automaticPaidLeaveDays: number;
+  absentDays: number;
+
+  workedMinutes: number;
   overtimeMinutes: number;
   overtimeMultiplier: number;
+  holidayOtMinutes: number;
+  weeklyOffOtMinutes: number;
+  weeklyOffMultiplier: number;
+  holidayOtMultiplier: number;
+
+  weeklyOffPay: number;
+  holidayOtPay: number;
+  overtimePay: number;
+  leaveEncashmentDays: number;
+  leaveEncashmentAmount: number;
+  lossOfPayAmount: number;
+
   grossSalary: number;
   loanInterestDeduction: number;
   loanPrincipalDeduction: number;
   totalDeductions: number;
   netSalary: number;
   salaryCapped: boolean;
-  paymentStatus: "PENDING" | "PAID";
-  paidDate?: string; // NEW
-  paymentMode?: string; // NEW: CASH | BANK
-  paidBy?: string; // NEW
+
+  paymentStatus: PayrollPaymentStatus;
+  paidDate?: string;
+  paymentMode?: PaymentMode;
+  paidBy?: string;
+}
+
+export interface PayrollCalculationLog {
+  id: number;
+  payrollRunId: number;
+  employeeId: number;
+  employeeCode: string;
+  employeeName: string;
+  calculationVersion: number;
+
+  monthlySalary: number;
+  hourlyRate: number;
+
+  presentDays: number;
+  weeklyOffDays: number;
+  weeklyOffWorkedDays: number;
+  holidayDays: number;
+  holidayWorkedDays: number;
+  paidLeaveDays: number;
+  automaticPaidLeaveDays: number;
+  absentDays: number;
+
+  approvedOtMinutes: number;
+  holidayOtMinutes: number;
+  weeklyOffOtMinutes: number;
+
+  basicSalaryAmount: number;
+  overtimeAmount: number;
+  weeklyOffPayAmount: number;
+  holidayOtAmount: number;
+  leaveEncashmentDays: number;
+  leaveEncashmentAmount: number;
+  lossOfPayAmount: number;
+
+  grossSalary: number;
+  finalNetSalary: number;
+
+  calculatedBy: string;
+  calculatedDate: string;
+  /** Human-readable "why this number" lines, e.g. "Overtime: 34.0 Hours x Rs.49.4500 x 1.5x = Rs.2521.95" */
+  breakdown: string[];
+}
+
+export interface PayrollDashboard {
+  payrollRunId: number;
+  year: number;
+  month: number;
+  status: PayrollStatus;
+
+  totalEmployees: number;
+  totalBasicSalary: number;
+  totalOvertime: number;
+  totalWeeklyOffAmount: number;
+  totalHolidayPay: number;
+  totalLeaveEncashment: number;
+  totalLossOfPay: number;
+  grandTotal: number;
+
+  paidCount: number;
+  pendingCount: number;
+}
+
+export interface PayrollException {
+  employeeId: number;
+  employeeCode: string;
+  employeeName: string;
+  /** MISSING_CHECKOUT, MISSING_ATTENDANCE, EXCESSIVE_OVERTIME, PENDING_OT_APPROVAL, LEAVE_CONFLICT, HOLIDAY_CONFLICT, INVALID_ATTENDANCE */
+  issues: string[];
+  affectedDates: string[];
 }
 
 export type ExpenseCategory = "RAW_MATERIAL" | "SALARY" | "ELECTRICITY" | "RENT" | "TRANSPORT" | "PACKAGING" | "MAINTENANCE" | "MISCELLANEOUS";
