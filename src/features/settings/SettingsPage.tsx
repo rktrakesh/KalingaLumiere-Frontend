@@ -53,6 +53,14 @@ const META: Record<string, SettingMeta> = {
       { value: "PRORATED", label: "Prorated", description: "Quota is scaled down based on active days in the month" },
     ],
   },
+  PAYROLL_GENERATION_POLICY: {
+    label: "Payroll Generation Policy",
+    description: "When enabled, payroll can only be generated after the configured payroll period has ended. This prevents accidental generation of incomplete payroll.",
+    options: [
+      { value: "GENERATE_AFTER_PERIOD_END", label: "Generate Only After Payroll Period Ends (Recommended)", description: "Payroll generation is blocked until the period has fully ended" },
+      { value: "ALLOW_DRAFT_GENERATION", label: "Allow Draft Payroll Generation", description: "Payroll may be generated at any time, starting in Draft status" },
+    ],
+  },
 };
 
 const DAY_LABELS: { iso: number; short: string; full: string }[] = [

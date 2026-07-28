@@ -146,6 +146,9 @@ export interface OvertimeRequest {
   approvedDate?: string;
   remarks?: string;
   createdDate?: string;
+  reopenedBy?: string;
+  reopenedDate?: string;
+  reopenReason?: string;
 }
 
 export type LoanStatus = "PENDING_APPROVAL" | "ACTIVE" | "CLOSED" | "REJECTED";

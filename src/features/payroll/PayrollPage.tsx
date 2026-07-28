@@ -937,11 +937,32 @@ export default function PayrollPage() {
         }
       >
         <div className="space-y-4">
-          <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 text-xs text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-            Payroll should be generated only after the month ends. This creates version 1 for the period — a settings snapshot is captured and reused for every future recalculation of this month.
-          </div>
           <Select label="Year *" value={String(genYear)} onChange={(e) => setGenYear(Number(e.target.value))} options={yOpts} />
           <Select label="Month *" value={String(genMonth)} onChange={(e) => setGenMonth(Number(e.target.value))} options={mOpts} />
+
+          {/*
+            Read-only hint only — the backend's PayrollGenerationPolicyValidator is the sole
+            source of truth. This never blocks the Generate button; it just tells the user
+            what to expect, per the "generation policy" that governs when payroll is allowed.
+          */}
+          {(() => {
+            const periodEnd = new Date(genYear, genMonth, 0); // day 0 of next month = last day of genMonth
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            periodEnd.setHours(0, 0, 0, 0);
+            const hasEnded = today > periodEnd;
+            const periodEndLabel = periodEnd.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+            return hasEnded ? (
+              <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 text-xs text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                {MONTHS[genMonth - 1]} {genYear} ended on {periodEndLabel} — this period is ready to generate.
+              </div>
+            ) : (
+              <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 text-xs text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                {MONTHS[genMonth - 1]} {genYear} doesn't end until {periodEndLabel}. Under the current Payroll Generation Policy, the backend may reject this request until then — a settings snapshot is captured and reused for every future recalculation of this month regardless.
+              </div>
+            );
+          })()}
+
           <Input label="Remarks" value={genRemarks} onChange={(e) => setGenRemarks(e.target.value)} placeholder="Optional" />
         </div>
       </Modal>
