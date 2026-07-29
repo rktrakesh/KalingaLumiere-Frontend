@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, X, CheckCircle2, XCircle, Sun, Umbrella, Clock, Calendar, Minus } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, CheckCircle2, XCircle, Sun, Umbrella, Clock, Minus } from "lucide-react";
 import { attendanceApi } from "@/services/api/attendance.api";
 import { Employee, AttendanceRecord } from "@/types";
 import { MONTHS } from "@/utils/format";
