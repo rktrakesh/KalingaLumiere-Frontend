@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { LayoutDashboard, Users, Clock, CalendarCheck, Calendar, Timer, CreditCard, DollarSign, Receipt, Wallet, Building2, UserCheck, ShoppingCart, ShoppingBag, Package, Factory, Settings, Lock, Bell, FileText, Search, ChevronDown, ChevronRight, Flame, X, Menu } from "lucide-react";
+import { LayoutDashboard, Users, Clock, CalendarCheck, Calendar, Timer, CreditCard, DollarSign, Receipt, Wallet, Building2, UserCheck, ShoppingCart, ShoppingBag, Package, Factory, Settings, Lock, FileText, Search, ChevronDown, ChevronRight, Flame, X, Menu } from "lucide-react";
 import { cn } from "@/utils/cn";
 
 interface NavItem {
