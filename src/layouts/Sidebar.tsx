@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { LayoutDashboard, Users, Clock, CalendarCheck, Calendar, Timer, CreditCard, DollarSign, Receipt, Wallet, Building2, UserCheck, ShoppingCart, ShoppingBag, Package, Factory, Settings, Lock, FileText, Search, ChevronDown, ChevronRight, Flame, X, Menu } from "lucide-react";
+import { LayoutDashboard, Users, Clock, CalendarCheck, Calendar, Timer, CreditCard, DollarSign, Receipt, Wallet, Building2, UserCheck, ShoppingCart, ShoppingBag, Package, Factory, Settings, Lock, Bell, FileText, Search, ChevronDown, ChevronRight, Flame, X, Menu } from "lucide-react";
 import { cn } from "@/utils/cn";
 
 interface NavItem {
@@ -12,7 +12,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { label: "Dashboard", path: "/", icon: <LayoutDashboard size={18} /> },
+  { label: "Dashboard", path: "/dashboard", icon: <LayoutDashboard size={18} /> },
   {
     label: "HR",
     icon: <Users size={18} />,
@@ -98,7 +98,11 @@ function NavItemComp({ item, collapsed }: { item: NavItem; collapsed: boolean })
   }
 
   return (
-    <NavLink to={item.path!} end={item.path === "/"} className={({ isActive }) => cn("flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all", isActive ? "bg-brand-600 text-white shadow-sm" : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800")}>
+    <NavLink
+      to={item.path!}
+      end={item.path === "/dashboard"}
+      className={({ isActive }) => cn("flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all", isActive ? "bg-brand-600 text-white shadow-sm" : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800")}
+    >
       <span className="flex-shrink-0">{item.icon}</span>
       {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
     </NavLink>
