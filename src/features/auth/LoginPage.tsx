@@ -1,27 +1,38 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { motion } from 'framer-motion';
-import { Eye, EyeOff, Flame, Lock, User, Sun, Moon } from 'lucide-react';
-import { authApi } from '@/services/api/auth.api';
-import { useAuthStore } from '@/store/authStore';
-import { useThemeStore } from '@/store/themeStore';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { useToast } from '@/hooks/useToast';
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { motion } from "framer-motion";
+import { Eye, EyeOff, Lock, User } from "lucide-react";
+import { authApi } from "@/services/api/auth.api";
+import { useAuthStore } from "@/store/authStore";
+import { useToast } from "@/hooks/useToast";
+import { EmberField } from "@/features/landing/components/EmberField";
 
-const schema = z.object({ username: z.string().min(1, 'Username required'), password: z.string().min(1, 'Password required') });
+const schema = z.object({ username: z.string().min(1, "Username required"), password: z.string().min(1, "Password required") });
 type FormData = z.infer<typeof schema>;
+
+// Slow, deliberate stagger — mirrors the pacing of the landing page's hero reveal.
+const fieldVariants = {
+  hidden: { opacity: 0, y: 18 },
+  visible: (delay: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.7, delay, ease: "easeOut" as const },
+  }),
+};
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const { setTokens, setUser } = useAuthStore();
-  const { isDark, toggle } = useThemeStore();
   const toast = useToast();
   const [showPass, setShowPass] = useState(false);
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({ resolver: zodResolver(schema) });
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<FormData>({ resolver: zodResolver(schema) });
 
   const onSubmit = async (data: FormData) => {
     try {
@@ -31,47 +42,98 @@ export default function LoginPage() {
       const profileRes = await authApi.getProfile();
       setUser(profileRes.data.data);
       toast.success(`Welcome back, ${token.fullName}!`);
-      navigate('/');
+      navigate("/");
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Invalid credentials');
+      toast.error(err?.response?.data?.message ?? "Invalid credentials");
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-50 via-white to-blue-50 dark:from-gray-950 dark:via-gray-900 dark:to-brand-950 p-4 relative">
-      <button onClick={toggle} className="absolute top-4 right-4 p-2.5 rounded-xl bg-white dark:bg-gray-800 shadow-card text-gray-500 hover:shadow-elevated transition-all">
-        {isDark ? <Sun size={18} /> : <Moon size={18} />}
-      </button>
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-brand-200/30 dark:bg-brand-900/20 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-200/30 dark:bg-blue-900/20 rounded-full blur-3xl" />
-      </div>
-      <motion.div initial={{ opacity: 0, y: 24, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.35 }} className="relative w-full max-w-md">
-        <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-gray-200/60 dark:border-gray-700/60 overflow-hidden">
-          <div className="bg-gradient-to-r from-brand-600 to-brand-700 px-8 pt-8 pb-10">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center">
-                <Flame size={22} className="text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-white">KalingaLumière</h1>
-                <p className="text-brand-200 text-xs">ERP Management System</p>
-              </div>
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-1">Welcome back</h2>
-            <p className="text-brand-200 text-sm">Sign in to continue to your dashboard</p>
+    <div className="relative min-h-screen flex items-center justify-center bg-[#070707] p-4 overflow-hidden">
+      <div className="pointer-events-none absolute left-1/2 top-1/3 h-[36rem] w-[36rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#D4AF37]/10 blur-[140px]" />
+      <EmberField density={34} />
+
+      <motion.div initial={{ opacity: 0, y: 28, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.9, ease: "easeOut" }} className="relative w-full max-w-md">
+        <div className="rounded-3xl border border-[#D4AF37]/20 bg-white/[0.04] backdrop-blur-2xl shadow-[0_0_60px_rgba(212,175,55,0.12)] overflow-hidden">
+          <div className="px-8 pt-10 pb-8 flex flex-col items-center text-center">
+            <motion.button type="button" onClick={() => navigate("/")} custom={0.2} initial="hidden" animate="visible" variants={fieldVariants} className="mb-6 cursor-pointer transition-opacity hover:opacity-80" aria-label="Back to Kalinga Lumière">
+              <img
+                src="/assets/logo/kalinga-lumiere.png"
+                alt="Kalinga Lumière"
+                className="h-20 w-auto object-contain mx-auto"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                  e.currentTarget.nextElementSibling?.classList.remove("hidden");
+                }}
+              />
+              <span className="hidden font-display text-xl tracking-[0.18em] text-white">KALINGA LUMI&Egrave;RE</span>
+            </motion.button>
+
+            <motion.h1 custom={0.35} initial="hidden" animate="visible" variants={fieldVariants} className="font-display text-3xl text-white">
+              Welcome Back
+            </motion.h1>
+            <motion.p custom={0.5} initial="hidden" animate="visible" variants={fieldVariants} className="mt-2 text-sm text-[#CFCFCF]">
+              Sign in to continue to your dashboard
+            </motion.p>
           </div>
-          <div className="-mt-4 h-6 bg-white dark:bg-gray-900 rounded-t-3xl" />
-          <div className="px-8 pb-8 pt-2">
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <Input label="Username" placeholder="Enter your username" leftIcon={<User size={15} />} error={errors.username?.message} autoComplete="username" autoFocus {...register('username')} />
-              <Input label="Password" type={showPass ? 'text' : 'password'} placeholder="Enter your password" leftIcon={<Lock size={15} />}
-                rightIcon={<button type="button" onClick={() => setShowPass(!showPass)} className="hover:text-gray-600 transition-colors">{showPass ? <EyeOff size={15} /> : <Eye size={15} />}</button>}
-                error={errors.password?.message} autoComplete="current-password" {...register('password')} />
-              <Button type="submit" className="w-full mt-2" size="lg" loading={isSubmitting}>Sign In</Button>
-            </form>
-            <p className="text-center text-xs text-gray-400 mt-6">KalingaLumière ERP v1.0 — Agarbatti Manufacturing</p>
-          </div>
+
+          <form onSubmit={handleSubmit(onSubmit)} className="px-8 pb-9 space-y-5">
+            <motion.div custom={0.65} initial="hidden" animate="visible" variants={fieldVariants} className="space-y-1.5">
+              <label htmlFor="username" className="block text-xs font-medium uppercase tracking-[0.2em] text-[#D4AF37]">
+                Username
+              </label>
+              <div className="relative">
+                <User size={15} className="absolute inset-y-0 left-3.5 my-auto text-[#CFCFCF]/60" />
+                <input
+                  id="username"
+                  autoComplete="username"
+                  autoFocus
+                  placeholder="Enter your username"
+                  className="w-full rounded-xl border border-white/10 bg-black/30 pl-10 pr-3.5 py-2.5 text-sm text-white placeholder-[#CFCFCF]/40 transition-all focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/60 focus:border-transparent"
+                  {...register("username")}
+                />
+              </div>
+              {errors.username && <p className="text-xs text-red-400">{errors.username.message}</p>}
+            </motion.div>
+
+            <motion.div custom={0.8} initial="hidden" animate="visible" variants={fieldVariants} className="space-y-1.5">
+              <label htmlFor="password" className="block text-xs font-medium uppercase tracking-[0.2em] text-[#D4AF37]">
+                Password
+              </label>
+              <div className="relative">
+                <Lock size={15} className="absolute inset-y-0 left-3.5 my-auto text-[#CFCFCF]/60" />
+                <input
+                  id="password"
+                  type={showPass ? "text" : "password"}
+                  autoComplete="current-password"
+                  placeholder="Enter your password"
+                  className="w-full rounded-xl border border-white/10 bg-black/30 pl-10 pr-10 py-2.5 text-sm text-white placeholder-[#CFCFCF]/40 transition-all focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/60 focus:border-transparent"
+                  {...register("password")}
+                />
+                <button type="button" onClick={() => setShowPass(!showPass)} className="absolute inset-y-0 right-3.5 my-auto text-[#CFCFCF]/60 hover:text-[#FFD76A] transition-colors">
+                  {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+              {errors.password && <p className="text-xs text-red-400">{errors.password.message}</p>}
+            </motion.div>
+
+            <motion.button
+              custom={0.95}
+              initial="hidden"
+              animate="visible"
+              variants={fieldVariants}
+              type="submit"
+              disabled={isSubmitting}
+              whileTap={{ scale: 0.97 }}
+              className="w-full mt-2 rounded-full bg-gradient-to-r from-[#D4AF37] to-[#FFD76A] py-3 text-sm font-semibold uppercase tracking-[0.15em] text-[#070707] shadow-[0_0_25px_rgba(212,175,55,0.3)] transition-transform hover:scale-[1.02] disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? "Signing In\u2026" : "Sign In"}
+            </motion.button>
+
+            <motion.p custom={1.1} initial="hidden" animate="visible" variants={fieldVariants} className="text-center text-xs text-[#CFCFCF]/60">
+              Kalinga Lumi&egrave;re ERP v1.0 &mdash; Agarbatti Manufacturing
+            </motion.p>
+          </form>
         </div>
       </motion.div>
     </div>
