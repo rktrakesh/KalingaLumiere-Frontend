@@ -118,16 +118,17 @@ export default function LoginPage() {
             </motion.div>
 
             <motion.button
-              custom={0.95}
+              custom={0.3} // Reduced from 0.95 so it animates in much faster
               initial="hidden"
               animate="visible"
               variants={fieldVariants}
               type="submit"
               disabled={isSubmitting}
-              whileTap={{ scale: 0.97 }}
-              className="w-full mt-2 rounded-full bg-gradient-to-r from-[#D4AF37] to-[#FFD76A] py-3 text-sm font-semibold uppercase tracking-[0.15em] text-[#070707] shadow-[0_0_25px_rgba(212,175,55,0.3)] transition-transform hover:scale-[1.02] disabled:opacity-60 disabled:cursor-not-allowed"
+              whileHover={{ scale: isSubmitting ? 1 : 1.02 }} // Let Framer Motion handle hover smoothly
+              whileTap={{ scale: isSubmitting ? 1 : 0.97 }} // Handled natively by Framer Motion
+              className="w-full mt-2 rounded-full bg-gradient-to-r from-[#D4AF37] to-[#FFD76A] py-3 text-sm font-semibold uppercase tracking-[0.15em] text-[#070707] shadow-[0_0_25px_rgba(212,175,55,0.3)] disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? "Signing In\u2026" : "Sign In"}
+              {isSubmitting ? "Signing In…" : "Sign In"}
             </motion.button>
 
             <motion.p custom={1.1} initial="hidden" animate="visible" variants={fieldVariants} className="text-center text-xs text-[#CFCFCF]/60">
