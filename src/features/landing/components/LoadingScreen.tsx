@@ -8,7 +8,7 @@ export function LoadingScreen() {
           <img
             src="/assets/logo/kalinga-lumiere.png"
             alt="Kalinga Lumière"
-            className="h-12 w-auto object-contain"
+            className="h-24 w-auto object-contain"
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).style.display = "none";
               e.currentTarget.nextElementSibling?.classList.remove("hidden");
