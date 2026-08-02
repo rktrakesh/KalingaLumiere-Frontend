@@ -9,6 +9,7 @@ import { authApi } from "@/services/api/auth.api";
 import { useAuthStore } from "@/store/authStore";
 import { useToast } from "@/hooks/useToast";
 import { EmberField } from "@/features/landing/components/EmberField";
+import { resolveDashboardRoute } from "@/utils/routing";
 
 const schema = z.object({ username: z.string().min(1, "Username required"), password: z.string().min(1, "Password required") });
 type FormData = z.infer<typeof schema>;
@@ -40,9 +41,16 @@ export default function LoginPage() {
       const token = res.data.data;
       setTokens(token.accessToken, token.refreshToken);
       const profileRes = await authApi.getProfile();
-      setUser(profileRes.data.data);
+      const profile = profileRes.data.data;
+      setUser(profile);
       toast.success(`Welcome back, ${token.fullName}!`);
-      navigate("/");
+
+      // Forced First-Login Password Change takes priority over everything else.
+      if (profile.mustChangePassword) {
+        navigate("/change-password");
+        return;
+      }
+      navigate(resolveDashboardRoute(profile));
     } catch (err: any) {
       toast.error(err?.response?.data?.message ?? "Invalid credentials");
     }
@@ -115,6 +123,11 @@ export default function LoginPage() {
                 </button>
               </div>
               {errors.password && <p className="text-xs text-red-400">{errors.password.message}</p>}
+              <div className="text-right">
+                <button type="button" onClick={() => navigate("/forgot-password")} className="text-xs text-[#CFCFCF]/70 hover:text-[#FFD76A] transition-colors">
+                  Forgot password?
+                </button>
+              </div>
             </motion.div>
 
             <motion.button

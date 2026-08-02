@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { LayoutDashboard, Users, Clock, CalendarCheck, Calendar, Timer, CreditCard, DollarSign, Receipt, Wallet, Building2, UserCheck, ShoppingCart, ShoppingBag, Package, Factory, Settings, Lock, FileText, Search, ChevronDown, ChevronRight, Flame, X, Menu } from "lucide-react";
+import { LayoutDashboard, Users, Clock, CalendarCheck, Calendar, Timer, CreditCard, DollarSign, Receipt, Wallet, Building2, UserCheck, ShoppingCart, ShoppingBag, Package, Factory, Settings, Lock, FileText, Search, ChevronDown, ChevronRight, Flame, X, Menu, Trophy } from "lucide-react";
 import { cn } from "@/utils/cn";
+import { useAuthStore } from "@/store/authStore";
 
 interface NavItem {
   label: string;
@@ -114,44 +115,51 @@ interface SidebarProps {
   onToggle: () => void;
 }
 
-export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => (
-  <motion.aside animate={{ width: collapsed ? 72 : 248 }} transition={{ duration: 0.25, ease: "easeInOut" }} className="flex flex-col h-full bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 overflow-hidden">
-    <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
-      <AnimatePresence>
-        {!collapsed && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center flex-shrink-0">
-              <Flame size={16} className="text-white" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-bold text-gray-900 dark:text-white truncate">KalingaLumière</p>
-              <p className="text-[10px] text-gray-400 truncate">ERP System</p>
-            </div>
-          </motion.div>
+export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
+  const { user } = useAuthStore();
+  // Performance Dashboard is only relevant (and only reachable — the backend has no
+  // linked-employee data to show anyone else) for SALES-category employees.
+  const items: NavItem[] = user?.employeeCategory === "SALES" ? [navItems[0], { label: "Performance", path: "/performance-dashboard", icon: <Trophy size={18} /> }, ...navItems.slice(1)] : navItems;
+
+  return (
+    <motion.aside animate={{ width: collapsed ? 72 : 248 }} transition={{ duration: 0.25, ease: "easeInOut" }} className="flex flex-col h-full bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
+        <AnimatePresence>
+          {!collapsed && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center flex-shrink-0">
+                <Flame size={16} className="text-white" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-gray-900 dark:text-white truncate">KalingaLumière</p>
+                <p className="text-[10px] text-gray-400 truncate">ERP System</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        {collapsed && (
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center mx-auto">
+            <Flame size={16} className="text-white" />
+          </div>
         )}
-      </AnimatePresence>
+        {!collapsed && (
+          <button onClick={onToggle} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 flex-shrink-0">
+            <X size={16} />
+          </button>
+        )}
+      </div>
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-0.5">
+        {items.map((item) => (
+          <NavItemComp key={item.label} item={item} collapsed={collapsed} />
+        ))}
+      </nav>
       {collapsed && (
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center mx-auto">
-          <Flame size={16} className="text-white" />
+        <div className="p-3 border-t border-gray-200 dark:border-gray-800">
+          <button onClick={onToggle} className="w-full flex items-center justify-center p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500">
+            <Menu size={18} />
+          </button>
         </div>
       )}
-      {!collapsed && (
-        <button onClick={onToggle} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 flex-shrink-0">
-          <X size={16} />
-        </button>
-      )}
-    </div>
-    <nav className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-0.5">
-      {navItems.map((item) => (
-        <NavItemComp key={item.label} item={item} collapsed={collapsed} />
-      ))}
-    </nav>
-    {collapsed && (
-      <div className="p-3 border-t border-gray-200 dark:border-gray-800">
-        <button onClick={onToggle} className="w-full flex items-center justify-center p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500">
-          <Menu size={18} />
-        </button>
-      </div>
-    )}
-  </motion.aside>
-);
+    </motion.aside>
+  );
+};

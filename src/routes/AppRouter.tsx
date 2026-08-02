@@ -4,11 +4,15 @@ import { AppLayout } from "@/layouts/AppLayout";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { RootRoute } from "./RootRoute";
 import LoginPage from "@/features/auth/LoginPage";
+import ForgotPasswordPage from "@/features/auth/ForgotPasswordPage";
+import ResetPasswordPage from "@/features/auth/ResetPasswordPage";
+import ChangePasswordPage from "@/features/auth/ChangePasswordPage";
 import { Skeleton } from "@/components/ui/Skeleton";
 
 const lazy_import = (fn: () => Promise<any>) => lazy(fn);
 
 const Dashboard = lazy_import(() => import("@/features/dashboard/DashboardPage"));
+const PerformanceMe = lazy_import(() => import("@/features/performance/EmployeePerformanceDashboardPage"));
 const Employees = lazy_import(() => import("@/features/employees/EmployeesPage"));
 const EmpDetail = lazy_import(() => import("@/features/employees/EmployeeDetailPage"));
 const Attendance = lazy_import(() => import("@/features/attendance/AttendancePage"));
@@ -54,9 +58,15 @@ export const AppRouter = () => (
     <Routes>
       <Route path="/" element={<RootRoute />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route element={<ProtectedRoute />}>
+        <Route path="/change-password" element={<ChangePasswordPage />} />
+      </Route>
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route path="/dashboard" element={S(Dashboard)} />
+          <Route path="/performance-dashboard" element={S(PerformanceMe)} />
           <Route path="/employees" element={S(Employees)} />
           <Route path="/employees/:id" element={S(EmpDetail)} />
           <Route path="/attendance" element={S(Attendance)} />

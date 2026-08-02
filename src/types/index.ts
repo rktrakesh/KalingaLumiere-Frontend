@@ -30,6 +30,9 @@ export interface TokenResponse {
   username: string;
   fullName: string;
   role: UserRole;
+  /** True right after onboarding or an admin-triggered reset — frontend must route
+   *  straight to Change Password and nowhere else until it's changed. */
+  mustChangePassword?: boolean;
 }
 export interface UserProfile {
   id: number;
@@ -38,8 +41,21 @@ export interface UserProfile {
   role: UserRole;
   employeeId?: number;
   status: string;
+  mustChangePassword?: boolean;
+  /** Null for users with no linked Employee (e.g. a system ADMIN account). Drives
+   *  Role-Based Dashboard Routing (see utils/routing.ts). */
+  employeeCategory?: EmployeeCategory | null;
 }
 export type UserRole = "ROLE_ADMIN" | "ROLE_MANAGER" | "ROLE_SUPERVISOR" | "ROLE_EMPLOYEE";
+export type EmployeeCategory = "FACTORY" | "SALES" | "ADMINISTRATION";
+
+export interface ForgotPasswordRequest {
+  email: string;
+}
+export interface ResetPasswordRequest {
+  token: string;
+  newPassword: string;
+}
 
 export interface Employee {
   id: number;
@@ -595,4 +611,50 @@ export interface AttendanceReport {
   month: number;
   totalEmployees: number;
   employees: { employeeId: number; employeeCode: string; employeeName: string; presentDays: number; absentDays: number; paidLeaveDays: number; holidayDays: number; totalWorkedMinutes: number }[];
+}
+
+// ---------------------------------------------------------------- Performance Engine
+export interface EmployeePerformanceDashboard {
+  employeeId: number;
+  employeeName: string;
+  periodYear: number;
+  periodMonth: number;
+  monthlyTarget: number;
+  monthlySales: number;
+  achievementPct: number;
+  incentiveEarned: number;
+  assignedCustomers: number;
+  activeCustomers: number;
+  inactiveCustomers: number;
+  ordersThisMonth: number;
+  averageOrderValue: number;
+  collectionPending: number;
+  newCustomers: number;
+  repeatCustomers: number;
+  largestOrder: number;
+  recommendationLabel: string;
+  recommendationSuggestion?: string;
+}
+export interface PerformanceRankingEntry {
+  employeeId: number;
+  employeeName: string;
+  monthlyTarget: number;
+  monthlySales: number;
+  achievementPct: number;
+  incentiveEarned: number;
+  recommendationLabel: string;
+}
+export interface ManagementPerformanceDashboard {
+  periodYear: number;
+  periodMonth: number;
+  topPerformers: PerformanceRankingEntry[];
+  lowestPerformers: PerformanceRankingEntry[];
+  targetAchievementRanking: PerformanceRankingEntry[];
+  monthlySalesRanking: PerformanceRankingEntry[];
+  totalAssignedCustomers: number;
+  totalActiveCustomers: number;
+  totalInactiveCustomers: number;
+  totalCollectionsPending: number;
+  totalMonthlySales: number;
+  totalIncentivePayout: number;
 }
