@@ -541,10 +541,13 @@ export interface Notification {
 export interface AppSetting {
   id: number;
   settingKey: string;
+  settingCategory: SettingCategory;
   settingValue: string;
   description?: string;
   effectiveFromDate: string;
 }
+
+export type SettingCategory = "ORGANIZATION" | "EMPLOYEE_HR" | "ATTENDANCE" | "LEAVE" | "PAYROLL" | "PERFORMANCE_INCENTIVE" | "INVENTORY" | "NOTIFICATIONS" | "SECURITY_IAM" | "FINANCE" | "SYSTEM";
 
 export interface MonthClosing {
   id?: number;
