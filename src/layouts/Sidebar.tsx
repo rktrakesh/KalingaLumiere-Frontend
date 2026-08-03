@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { LayoutDashboard, Users, Clock, CalendarCheck, Calendar, Timer, CreditCard, DollarSign, Receipt, Wallet, Building2, UserCheck, ShoppingCart, ShoppingBag, Package, Factory, Settings, Lock, FileText, Search, ChevronDown, ChevronRight, Flame, X, Menu, Trophy } from "lucide-react";
+import { LayoutDashboard, Users, Clock, CalendarCheck, Calendar, Timer, CreditCard, Receipt, Wallet, Building2, UserCheck, ShoppingCart, ShoppingBag, Package, Factory, Settings, Lock, FileText, Search, ChevronDown, ChevronRight, Flame, X, Menu, Trophy, IndianRupee } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { useAuthStore } from "@/store/authStore";
 
@@ -27,9 +27,9 @@ const navItems: NavItem[] = [
   },
   {
     label: "Payroll",
-    icon: <DollarSign size={18} />,
+    icon: <IndianRupee size={18} />,
     children: [
-      { label: "Payroll Runs", path: "/payroll", icon: <DollarSign size={16} /> },
+      { label: "Payroll Runs", path: "/payroll", icon: <IndianRupee size={16} /> },
       { label: "Loans", path: "/loans", icon: <CreditCard size={16} /> },
     ],
   },

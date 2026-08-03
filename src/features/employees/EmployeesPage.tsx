@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Users, Plus, Eye, UserX, DollarSign, CalendarDays } from "lucide-react";
+import { Users, Plus, Eye, UserX, CalendarDays, IndianRupee } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { employeesApi } from "@/services/api/employees.api";
 import { Employee } from "@/types";
@@ -136,7 +136,7 @@ export default function EmployeesPage() {
           <Button
             size="sm"
             variant="ghost"
-            icon={<DollarSign size={13} />}
+            icon={<IndianRupee size={13} />}
             onClick={() => {
               setShowSalary(e);
               sForm.reset();

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { DollarSign, Play, RefreshCw, Eye, Lock, Unlock, CheckCircle2, ShieldCheck, CreditCard, Banknote, AlertTriangle, Users, TrendingDown, IndianRupee, Printer, History, ListChecks, Search, FileText, ChevronRight } from "lucide-react";
+import { Play, RefreshCw, Eye, Lock, Unlock, CheckCircle2, ShieldCheck, CreditCard, Banknote, AlertTriangle, Users, TrendingDown, IndianRupee, Printer, History, ListChecks, Search, FileText, ChevronRight } from "lucide-react";
 import { payrollApi, DisburseRequest, ReopenPayrollRequest, ActionRemarksRequest } from "@/services/api/payroll.api";
 import { DataTable, Column } from "@/components/common/DataTable";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -775,7 +775,7 @@ export default function PayrollPage() {
       <PageHeader
         title="Payroll"
         subtitle="Generate, verify, approve and disburse monthly payroll"
-        icon={<DollarSign size={20} />}
+        icon={<IndianRupee size={20} />}
         actions={
           <div className="flex gap-2">
             <Button variant="outline" icon={<ListChecks size={15} />} onClick={() => setExceptionModalOpen(true)}>
@@ -795,7 +795,7 @@ export default function PayrollPage() {
             <div className="grid grid-cols-3 gap-4 mb-5">
               <KPICard title="Latest Employees" value={runs[0]?.totalEmployees ?? 0} icon={<Users size={18} />} color="blue" index={0} />
               <KPICard title="Latest Gross" value={formatCurrency(runs[0]?.totalGross ?? 0)} icon={<TrendingDown size={18} />} color="orange" index={1} />
-              <KPICard title="Latest Net Payout" value={formatCurrency(runs[0]?.totalNet ?? 0)} icon={<DollarSign size={18} />} color="green" index={2} />
+              <KPICard title="Latest Net Payout" value={formatCurrency(runs[0]?.totalNet ?? 0)} icon={<IndianRupee size={18} />} color="green" index={2} />
             </div>
           )}
           <DataTable columns={runColumns} data={runs} loading={runsLoading} rowKey={(r) => r.id} emptyMessage="No payroll runs yet. Click Generate Payroll to start." />
