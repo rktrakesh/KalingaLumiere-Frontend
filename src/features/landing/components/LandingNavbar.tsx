@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/utils/cn";
+import { publicAssetUrl, useCompanyBranding } from "@/services/api/branding.api";
 
 const NAV_LINKS = [
   { label: "Home", href: "#home" },
@@ -11,9 +12,18 @@ const NAV_LINKS = [
 ];
 
 export function LandingNavbar() {
+  const { data: branding } = useCompanyBranding();
+  const companyName = branding?.companyName ?? "ERP System";
+  const companyShortName = branding?.companyShortName ?? "ERP";
+  const companyLogoUrl = publicAssetUrl(branding?.companyLogoUrl);
   const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [logoFailed, setLogoFailed] = useState(false);
+
+  useEffect(() => {
+    setLogoFailed(false);
+  }, [companyLogoUrl]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -30,17 +40,14 @@ export function LandingNavbar() {
   return (
     <header className={cn("fixed inset-x-0 top-0 z-50 transition-all duration-500", scrolled ? "border-b border-white/10 bg-[#070707]/70 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.35)]" : "bg-transparent")}>
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-10">
-        <button onClick={() => scrollTo("#home")} className="flex items-center gap-3" aria-label="Kalinga Lumière — Home">
-          <img
-            src="/assets/logo/kalinga-lumiere.png"
-            alt="Kalinga Lumière"
+        <button onClick={() => scrollTo("#home")} className="flex items-center gap-3" aria-label={`${companyName} - Home`}>
+          {companyLogoUrl && !logoFailed && <img
+            src={companyLogoUrl}
+            alt={`${companyName} logo`}
             className="h-10 w-auto object-contain"
-            onError={(e) => {
-              (e.currentTarget as HTMLImageElement).style.display = "none";
-              e.currentTarget.nextElementSibling?.classList.remove("hidden");
-            }}
-          />
-          <span className="hidden font-display text-lg tracking-[0.18em] text-white">KALINGA LUMI&Egrave;RE</span>
+            onError={() => setLogoFailed(true)}
+          />}
+          {(!companyLogoUrl || logoFailed) && <span className="font-display text-lg tracking-[0.18em] text-white">{companyShortName}</span>}
         </button>
 
         <div className="hidden items-center gap-10 md:flex">

@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { LayoutDashboard, Users, Clock, CalendarCheck, Calendar, Timer, CreditCard, Receipt, Wallet, Building2, UserCheck, ShoppingCart, ShoppingBag, Package, Factory, Settings, Lock, FileText, Search, ChevronDown, ChevronRight, Flame, X, Menu, Trophy, IndianRupee } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { useAuthStore } from "@/store/authStore";
+import { publicAssetUrl, useCompanyBranding } from "@/services/api/branding.api";
 
 interface NavItem {
   label: string;
@@ -117,6 +118,15 @@ interface SidebarProps {
 
 export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   const { user } = useAuthStore();
+  const { data: branding } = useCompanyBranding();
+  const companyName = branding?.companyName ?? "ERP System";
+  const companyShortName = branding?.companyShortName ?? "ERP";
+  const companyLogoUrl = publicAssetUrl(branding?.companyLogoUrl);
+  const [logoFailed, setLogoFailed] = useState(false);
+  const showLogo = Boolean(companyLogoUrl) && !logoFailed;
+  useEffect(() => {
+    setLogoFailed(false);
+  }, [companyLogoUrl]);
   // Performance Dashboard is only relevant (and only reachable — the backend has no
   // linked-employee data to show anyone else) for SALES-category employees.
   const items: NavItem[] = user?.employeeCategory === "SALES" ? [navItems[0], { label: "Performance", path: "/performance-dashboard", icon: <Trophy size={18} /> }, ...navItems.slice(1)] : navItems;
@@ -128,18 +138,18 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
           {!collapsed && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2.5 min-w-0">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center flex-shrink-0">
-                <Flame size={16} className="text-white" />
+                {showLogo ? <img src={companyLogoUrl} alt={`${companyName} logo`} className="h-6 w-6 object-contain" onError={() => setLogoFailed(true)} /> : <Flame size={16} className="text-white" aria-label={companyShortName} />}
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-bold text-gray-900 dark:text-white truncate">KalingaLumière</p>
-                <p className="text-[10px] text-gray-400 truncate">ERP System</p>
+                <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{companyName}</p>
+                <p className="text-[10px] text-gray-400 truncate">{companyShortName}</p>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
         {collapsed && (
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center mx-auto">
-            <Flame size={16} className="text-white" />
+            {showLogo ? <img src={companyLogoUrl} alt={`${companyName} logo`} className="h-6 w-6 object-contain" onError={() => setLogoFailed(true)} /> : <Flame size={16} className="text-white" aria-label={companyShortName} />}
           </div>
         )}
         {!collapsed && (

@@ -538,16 +538,39 @@ export interface Notification {
   createdDate: string;
   readDate?: string;
 }
-export interface AppSetting {
+export type SettingUpdateMode = "IMMEDIATE" | "SCHEDULED";
+
+/** Mirrors the backend SettingResponse, including its temporary settingValue alias. */
+export interface SettingResponse {
   id: number;
   settingKey: string;
   settingCategory: SettingCategory;
+  dataType: string;
+  editable: boolean;
+  description: string;
+  /** Compatibility alias for activeValue. */
   settingValue: string;
-  description?: string;
-  effectiveFromDate: string;
+  activeValue: string;
+  activeEffectiveFromDate: string;
+  pendingValue: string | null;
+  pendingEffectiveDate: string | null;
+  pendingStatus: string | null;
+  updateMode: SettingUpdateMode;
+  /** Compatibility alias retained while older clients migrate. */
+  effectiveFromDate?: string;
 }
 
-export type SettingCategory = "ORGANIZATION" | "EMPLOYEE_HR" | "ATTENDANCE" | "LEAVE" | "PAYROLL" | "PERFORMANCE_INCENTIVE" | "INVENTORY" | "NOTIFICATIONS" | "SECURITY_IAM" | "FINANCE" | "SYSTEM";
+/** Backwards-compatible name used by existing settings UI code. */
+export type AppSetting = SettingResponse;
+
+export interface SettingUpdateResult {
+  setting: SettingResponse;
+  updateMode: SettingUpdateMode;
+  replacedExistingPending: boolean;
+  message: string;
+}
+
+export type SettingCategory = "ORGANIZATION" | "EMPLOYEE_HR" | "ATTENDANCE" | "LEAVE" | "PAYROLL" | "PERFORMANCE_INCENTIVE" | "PRODUCTION" | "INVENTORY" | "NOTIFICATIONS" | "SECURITY_IAM" | "FINANCE" | "SYSTEM";
 
 export interface MonthClosing {
   id?: number;

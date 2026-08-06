@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,6 +10,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useToast } from "@/hooks/useToast";
 import { EmberField } from "@/features/landing/components/EmberField";
 import { resolveDashboardRoute } from "@/utils/routing";
+import { publicAssetUrl, useCompanyBranding } from "@/services/api/branding.api";
 
 const schema = z.object({ username: z.string().min(1, "Username required"), password: z.string().min(1, "Password required") });
 type FormData = z.infer<typeof schema>;
@@ -25,10 +26,18 @@ const fieldVariants = {
 };
 
 export default function LoginPage() {
+  const { data: branding } = useCompanyBranding();
+  const companyName = branding?.companyName ?? "ERP System";
+  const companyShortName = branding?.companyShortName ?? "ERP";
+  const companyLogoUrl = publicAssetUrl(branding?.companyLogoUrl);
   const navigate = useNavigate();
   const { setTokens, setUser } = useAuthStore();
   const toast = useToast();
   const [showPass, setShowPass] = useState(false);
+  const [logoFailed, setLogoFailed] = useState(false);
+  useEffect(() => {
+    setLogoFailed(false);
+  }, [companyLogoUrl]);
   const {
     register,
     handleSubmit,
@@ -64,17 +73,14 @@ export default function LoginPage() {
       <motion.div initial={{ opacity: 0, y: 28, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.9, ease: "easeOut" }} className="relative w-full max-w-md">
         <div className="rounded-3xl border border-[#D4AF37]/20 bg-white/[0.04] backdrop-blur-2xl shadow-[0_0_60px_rgba(212,175,55,0.12)] overflow-hidden">
           <div className="px-8 pt-10 pb-8 flex flex-col items-center text-center">
-            <motion.button type="button" onClick={() => navigate("/")} custom={0.2} initial="hidden" animate="visible" variants={fieldVariants} className="mb-6 cursor-pointer transition-opacity hover:opacity-80" aria-label="Back to Kalinga Lumière">
-              <img
-                src="/assets/logo/kalinga-lumiere.png"
-                alt="Kalinga Lumière"
+            <motion.button type="button" onClick={() => navigate("/")} custom={0.2} initial="hidden" animate="visible" variants={fieldVariants} className="mb-6 cursor-pointer transition-opacity hover:opacity-80" aria-label={`Back to ${companyName}`}>
+              {companyLogoUrl && !logoFailed && <img
+                src={companyLogoUrl}
+                alt={`${companyName} logo`}
                 className="h-20 w-auto object-contain mx-auto"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).style.display = "none";
-                  e.currentTarget.nextElementSibling?.classList.remove("hidden");
-                }}
-              />
-              <span className="hidden font-display text-xl tracking-[0.18em] text-white">KALINGA LUMI&Egrave;RE</span>
+                onError={() => setLogoFailed(true)}
+              />}
+              {(!companyLogoUrl || logoFailed) && <span className="font-display text-xl tracking-[0.18em] text-white">{companyShortName}</span>}
             </motion.button>
 
             <motion.h1 custom={0.35} initial="hidden" animate="visible" variants={fieldVariants} className="font-display text-3xl text-white">
@@ -145,7 +151,7 @@ export default function LoginPage() {
             </motion.button>
 
             <motion.p custom={1.1} initial="hidden" animate="visible" variants={fieldVariants} className="text-center text-xs text-[#CFCFCF]/60">
-              Kalinga Lumi&egrave;re ERP v1.0 &mdash; Agarbatti Manufacturing
+              {companyName} ERP v1.0
             </motion.p>
           </form>
         </div>

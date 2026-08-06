@@ -32,6 +32,7 @@ const CATEGORY_META: Record<SettingCategory, CategoryMeta> = {
   LEAVE: { label: "Leave", description: "Leave allocation and settlement rules" },
   PAYROLL: { label: "Payroll", description: "Payroll calculation and processing rules" },
   PERFORMANCE_INCENTIVE: { label: "Performance & Incentive", description: "Sales performance and incentive rules" },
+  PRODUCTION: { label: "Production", description: "Production process defaults and controls" },
   INVENTORY: { label: "Inventory", description: "Inventory validation and alert rules" },
   NOTIFICATIONS: { label: "Notifications", description: "System notification preferences and reminders" },
   SECURITY_IAM: { label: "Security & IAM", description: "Authentication, password, and account-security rules" },
@@ -39,7 +40,7 @@ const CATEGORY_META: Record<SettingCategory, CategoryMeta> = {
   SYSTEM: { label: "System", description: "Cross-system operational settings" },
 };
 
-const CATEGORY_ORDER: SettingCategory[] = ["ORGANIZATION", "EMPLOYEE_HR", "ATTENDANCE", "LEAVE", "PAYROLL", "PERFORMANCE_INCENTIVE", "INVENTORY", "NOTIFICATIONS", "SECURITY_IAM", "FINANCE", "SYSTEM"];
+const CATEGORY_ORDER: SettingCategory[] = ["ORGANIZATION", "EMPLOYEE_HR", "ATTENDANCE", "LEAVE", "PAYROLL", "PERFORMANCE_INCENTIVE", "PRODUCTION", "INVENTORY", "NOTIFICATIONS", "SECURITY_IAM", "FINANCE", "SYSTEM"];
 
 const META: Record<string, SettingMeta> = {
   PAID_LEAVES_PER_MONTH: { label: "Paid Leaves Per Month", description: "Monthly paid leave entitlement per employee", unit: "days" },
@@ -50,6 +51,9 @@ const META: Record<string, SettingMeta> = {
   SALARY_PAYMENT_DAY: { label: "Salary Payment Day", description: "Day of next month when salary is disbursed", unit: "th" },
   LOW_STOCK_ALERT_ENABLED: { label: "Low Stock Alert", description: "Enable notifications when stock reaches reorder level" },
   MONTH_CLOSING_REQUIRES_PAYROLL: { label: "Month Closing Requires Payroll", description: "Block month closing until payroll has been generated" },
+  EMPLOYEE_CODE_TEMPLATE: { label: "Employee Code Template", description: "Applies to new employees only. Example: {CompanyShortName}{FirstName4}{EmployeeNumber} -> IWRANI0001. Placeholders: {CompanyShortName}, {CompanyName}, {FirstName}, {FirstName4}, {LastName}, {EmployeeNumber}, {JoiningYear}" },
+  USERNAME_GENERATION_RULE: { label: "Username Template", description: "Applies to new user accounts only. Example: {CompanyShortName}_{FirstName}_{EmployeeNumber} -> iw_rakesh_0001. Placeholders: {CompanyShortName}, {CompanyName}, {FirstName}, {FirstName4}, {LastName}, {EmployeeNumber}, {JoiningYear}" },
+  EMPLOYEE_CODE_PREFIX: { label: "Employee Code Prefix (Legacy)", description: "Read-only legacy metadata. New employee codes use Employee Code Template and do not use this value." },
 
   // ── Payroll engine settings ──────────────────────────────────────────────
   WEEKLY_OFF_MULTIPLIER: { label: "Weekly Off Multiplier", description: "Pay multiplier when an employee works on a weekly-off day", unit: "x" },
@@ -124,8 +128,8 @@ export default function SettingsPage() {
 
   const updateM = useMutation({
     mutationFn: ({ key, value }: { key: string; value: string }) => settingsApi.update(key, value),
-    onSuccess: (_, vars) => {
-      toast.success("Setting updated — effective from next payroll cycle");
+    onSuccess: (response, vars) => {
+      toast.success(response.data.data.message);
       qc.invalidateQueries({ queryKey: ["settings"] });
       setEditValues((prev) => {
         const n = { ...prev };
@@ -140,7 +144,8 @@ export default function SettingsPage() {
     },
   });
 
-  const hasChange = (s: AppSetting) => editValues[s.settingKey] !== undefined && editValues[s.settingKey] !== s.settingValue;
+  const activeValue = (s: AppSetting) => s.activeValue ?? s.settingValue;
+  const hasChange = (s: AppSetting) => editValues[s.settingKey] !== undefined && editValues[s.settingKey] !== activeValue(s);
 
   const save = (key: string, value: string) => {
     setSaving(key);
@@ -158,11 +163,11 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <PageHeader title="Settings" subtitle="Configure business rules — changes apply from next payroll cycle" icon={<Settings size={20} />} />
+      <PageHeader title="Settings" subtitle="Configure active business settings and scheduled policy changes" icon={<Settings size={20} />} />
       <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 flex items-start gap-3 mb-5">
         <Info size={16} className="text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
         <p className="text-sm text-amber-700 dark:text-amber-300">
-          <strong>Important:</strong> All setting changes take effect from the <strong>first day of the next month</strong>. A month that already has payroll generated keeps using the settings that were in effect when it was first calculated.
+          <strong>Important:</strong> Branding and employee identifier templates update immediately. Policy settings may be scheduled; their active value remains in effect until the pending update activates.
         </p>
       </div>
       <div className="relative mb-5 max-w-md">
@@ -197,9 +202,18 @@ export default function SettingsPage() {
             <div className="space-y-3">
               {visibleSettings.map((setting) => {
                 const meta = META[setting.settingKey];
-                const currentVal = editValues[setting.settingKey] ?? setting.settingValue;
-                const isBoolean = setting.settingValue === "true" || setting.settingValue === "false";
+                const currentVal = editValues[setting.settingKey] ?? activeValue(setting);
+                const dataType = setting.dataType?.toUpperCase();
+                const isBoolean = dataType === "BOOLEAN";
                 const isWeeklyOffDays = setting.settingKey === "WEEKLY_OFF_DAYS";
+                const isIdentifierTemplate = setting.settingKey === "EMPLOYEE_CODE_TEMPLATE" || setting.settingKey === "USERNAME_GENERATION_RULE";
+                const isEditable = setting.editable;
+                const hasPendingValue = setting.pendingValue !== null && setting.pendingValue !== undefined;
+                const inputType = dataType === "INTEGER" || dataType === "DECIMAL" ? "number"
+                  : dataType === "EMAIL" ? "email"
+                  : dataType === "URL" ? "url"
+                  : "text";
+                const numberStep = dataType === "INTEGER" ? "1" : dataType === "DECIMAL" ? "0.01" : undefined;
                 const selectedDays = isWeeklyOffDays ? parseWeeklyOffDays(currentVal) : [];
 
                 return (
@@ -223,6 +237,7 @@ export default function SettingsPage() {
                                     key={d.iso}
                                     type="button"
                                     title={d.full}
+                                    disabled={!isEditable}
                                     onClick={() => {
                                       const next = active ? selectedDays.filter((x) => x !== d.iso) : [...selectedDays, d.iso];
                                       next.sort((a, b) => a - b);
@@ -238,13 +253,14 @@ export default function SettingsPage() {
                           ) : meta?.options ? (
                             // ── Enum-style setting: fixed dropdown of allowed values ──
                             <div className="w-64">
-                              <Select label="" value={currentVal} onChange={(e) => setEditValues((prev) => ({ ...prev, [setting.settingKey]: e.target.value }))} options={meta.options.map((o) => ({ value: o.value, label: o.label }))} />
+                              <Select label="" value={currentVal} disabled={!isEditable} onChange={(e) => setEditValues((prev) => ({ ...prev, [setting.settingKey]: e.target.value }))} options={meta.options.map((o) => ({ value: o.value, label: o.label }))} />
                             </div>
                           ) : isBoolean ? (
                             <div className="flex gap-2">
                               {["true", "false"].map((v) => (
                                 <button
                                   key={v}
+                                  disabled={!isEditable}
                                   onClick={() => setEditValues((prev) => ({ ...prev, [setting.settingKey]: v }))}
                                   className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${currentVal === v ? (v === "true" ? "bg-emerald-600 text-white" : "bg-red-500 text-white") : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"}`}
                                 >
@@ -252,13 +268,17 @@ export default function SettingsPage() {
                                 </button>
                               ))}
                             </div>
+                          ) : isIdentifierTemplate ? (
+                            <div className="w-full max-w-xl">
+                              <Input label="" type="text" disabled={!isEditable} value={currentVal} onChange={(e) => setEditValues((prev) => ({ ...prev, [setting.settingKey]: e.target.value }))} />
+                            </div>
                           ) : (
                             <div className="w-40">
-                              <Input label="" type="number" value={currentVal} onChange={(e) => setEditValues((prev) => ({ ...prev, [setting.settingKey]: e.target.value }))} step={setting.settingKey.includes("MULTIPLIER") || setting.settingKey.includes("RATE") ? "0.01" : "1"} />
+                              <Input label="" type={inputType} disabled={!isEditable} value={currentVal} onChange={(e) => setEditValues((prev) => ({ ...prev, [setting.settingKey]: e.target.value }))} step={numberStep} />
                             </div>
                           )}
 
-                          {hasChange(setting) && (
+                          {isEditable && hasChange(setting) && (
                             <Button size="sm" icon={<Save size={13} />} loading={saving === setting.settingKey} onClick={() => save(setting.settingKey, editValues[setting.settingKey])}>
                               Save
                             </Button>
@@ -270,17 +290,25 @@ export default function SettingsPage() {
                       </div>
 
                       <div className="text-right flex-shrink-0">
-                        <p className="text-xs text-gray-400 mb-0.5">Current</p>
+                        <p className="text-xs text-gray-400 mb-0.5">Active / current value</p>
                         <p className="text-lg font-bold text-brand-600 dark:text-brand-400">
                           {isWeeklyOffDays
-                            ? parseWeeklyOffDays(setting.settingValue)
+                            ? parseWeeklyOffDays(activeValue(setting))
                                 .map((iso) => DAY_LABELS.find((d) => d.iso === iso)?.short)
                                 .join(", ")
                             : meta?.options
-                              ? (meta.options.find((o) => o.value === setting.settingValue)?.label ?? setting.settingValue)
-                              : setting.settingValue}
+                              ? (meta.options.find((o) => o.value === activeValue(setting))?.label ?? activeValue(setting))
+                              : activeValue(setting)}
                         </p>
-                        <p className="text-xs text-gray-400 mt-1">Effective: {formatDate(setting.effectiveFromDate)}</p>
+                        <p className="text-xs text-gray-400 mt-1">Active from: {formatDate(setting.activeEffectiveFromDate ?? setting.effectiveFromDate)}</p>
+                        <p className="text-xs text-gray-500 mt-1">Update mode: {setting.updateMode}</p>
+                        {hasPendingValue && (
+                          <div className="mt-2 rounded-md bg-amber-50 px-2 py-1.5 text-xs text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
+                            <p><strong>Pending value:</strong> {setting.pendingValue}</p>
+                            <p><strong>Effective date:</strong> {setting.pendingEffectiveDate ? formatDate(setting.pendingEffectiveDate) : "Not available"}</p>
+                            <p><strong>Status:</strong> {setting.pendingStatus ?? "Not available"}</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </Card>

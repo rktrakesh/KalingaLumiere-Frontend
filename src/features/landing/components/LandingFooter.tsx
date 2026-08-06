@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { Instagram, Facebook, Twitter } from "lucide-react";
+import { publicAssetUrl, useCompanyBranding } from "@/services/api/branding.api";
 
 const QUICK_LINKS = [
   { label: "Home", href: "#home" },
@@ -13,22 +15,27 @@ const SOCIALS = [
 ];
 
 export function LandingFooter() {
+  const { data: branding } = useCompanyBranding();
+  const companyName = branding?.companyName ?? "ERP System";
+  const companyShortName = branding?.companyShortName ?? "ERP";
+  const companyLogoUrl = publicAssetUrl(branding?.companyLogoUrl);
+  const [logoFailed, setLogoFailed] = useState(false);
+  useEffect(() => {
+    setLogoFailed(false);
+  }, [companyLogoUrl]);
   const scrollTo = (href: string) => document.querySelector(href)?.scrollIntoView({ behavior: "smooth" });
 
   return (
     <footer className="relative border-t border-white/10 bg-[#050505] px-6 py-14">
       <div className="mx-auto flex max-w-6xl flex-col items-center gap-10 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col items-center gap-3 sm:items-start">
-          <img
-            src="/assets/logo/kalinga-lumiere.png"
-            alt="Kalinga Lumière"
+          {companyLogoUrl && !logoFailed && <img
+            src={companyLogoUrl}
+            alt={`${companyName} logo`}
             className="h-8 w-auto object-contain"
-            onError={(e) => {
-              (e.currentTarget as HTMLImageElement).style.display = "none";
-              e.currentTarget.nextElementSibling?.classList.remove("hidden");
-            }}
-          />
-          <span className="hidden font-display text-base tracking-[0.18em] text-white">KALINGA LUMI&Egrave;RE</span>
+            onError={() => setLogoFailed(true)}
+          />}
+          {(!companyLogoUrl || logoFailed) && <span className="font-display text-base tracking-[0.18em] text-white">{companyShortName}</span>}
           <p className="max-w-xs text-center text-sm text-[#CFCFCF] sm:text-left">Fragrance crafted with tradition, manufactured with precision.</p>
         </div>
 
@@ -53,7 +60,7 @@ export function LandingFooter() {
         </div>
       </div>
 
-      <div className="mx-auto mt-10 max-w-6xl border-t border-white/5 pt-6 text-center text-xs text-[#CFCFCF]/70">&copy; {new Date().getFullYear()} Kalinga Lumi&egrave;re. All rights reserved.</div>
+      <div className="mx-auto mt-10 max-w-6xl border-t border-white/5 pt-6 text-center text-xs text-[#CFCFCF]/70">&copy; {new Date().getFullYear()} {companyName}. All rights reserved.</div>
     </footer>
   );
 }
