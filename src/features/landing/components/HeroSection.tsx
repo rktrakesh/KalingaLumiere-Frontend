@@ -36,7 +36,7 @@ export function HeroSection() {
   }, [prefersReducedMotion]);
 
   return (
-    <section id="home" className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#070707] px-6">
+    <section id="home" className="relative flex min-h-screen scroll-mt-20 items-center justify-center overflow-hidden bg-[#070707] px-6">
       {/* ambient glow */}
       <div className="pointer-events-none absolute left-1/2 top-1/3 h-[36rem] w-[36rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#D4AF37]/10 blur-[140px]" />
       <EmberField density={50} />

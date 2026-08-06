@@ -20,6 +20,9 @@ export function useLenisScroll() {
       duration: 1.1,
       easing: (t: number) => Math.min(1, 1 - Math.pow(2, -10 * t)),
       smoothWheel: true,
+      // Lenis blocks anchor navigation by default. Enabling it here keeps the
+      // landing navigation functional and offsets fixed-header overlap.
+      anchors: true,
     });
 
     // Drive Lenis off GSAP's own ticker (already rAF-synced) so any future

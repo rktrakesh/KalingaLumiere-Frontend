@@ -32,15 +32,10 @@ export function LandingNavbar() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const scrollTo = (href: string) => {
-    setMobileOpen(false);
-    document.querySelector(href)?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
   return (
     <header className={cn("fixed inset-x-0 top-0 z-50 transition-all duration-500", scrolled ? "border-b border-white/10 bg-[#070707]/70 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.35)]" : "bg-transparent")}>
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-10">
-        <button onClick={() => scrollTo("#home")} className="flex items-center gap-3" aria-label={`${companyName} - Home`}>
+        <a href="#home" onClick={() => setMobileOpen(false)} className="flex items-center gap-3" aria-label={`${companyName} - Home`}>
           {companyLogoUrl && !logoFailed && <img
             src={companyLogoUrl}
             alt={`${companyName} logo`}
@@ -48,34 +43,34 @@ export function LandingNavbar() {
             onError={() => setLogoFailed(true)}
           />}
           {(!companyLogoUrl || logoFailed) && <span className="font-display text-lg tracking-[0.18em] text-white">{companyShortName}</span>}
-        </button>
+        </a>
 
         <div className="hidden items-center gap-10 md:flex">
           {NAV_LINKS.map((link) => (
-            <button key={link.href} onClick={() => scrollTo(link.href)} className="text-sm font-medium tracking-wide text-[#CFCFCF] transition-colors hover:text-[#FFD76A]">
+            <a key={link.href} href={link.href} className="text-sm font-medium tracking-wide text-[#CFCFCF] transition-colors hover:text-[#FFD76A]">
               {link.label}
-            </button>
+            </a>
           ))}
           <button onClick={() => navigate("/login")} className="rounded-full bg-gradient-to-r from-[#D4AF37] to-[#FFD76A] px-6 py-2 text-sm font-semibold tracking-wide text-[#070707] shadow-[0_0_20px_rgba(212,175,55,0.35)] transition-transform hover:scale-105">
             Sign In
           </button>
         </div>
 
-        <button className="text-white md:hidden" onClick={() => setMobileOpen((o) => !o)} aria-label={mobileOpen ? "Close menu" : "Open menu"}>
+        <button type="button" className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 text-white md:hidden" onClick={() => setMobileOpen((o) => !o)} aria-label={mobileOpen ? "Close menu" : "Open menu"} aria-expanded={mobileOpen} aria-controls="landing-mobile-menu">
           {mobileOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
       </nav>
 
       <AnimatePresence>
         {mobileOpen && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3, ease: "easeInOut" }} className="overflow-hidden border-t border-white/10 bg-[#070707]/95 backdrop-blur-xl md:hidden">
+          <motion.div id="landing-mobile-menu" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3, ease: "easeInOut" }} className="overflow-hidden border-t border-white/10 bg-[#070707]/95 backdrop-blur-xl md:hidden">
             <div className="flex flex-col gap-1 px-6 py-4">
               {NAV_LINKS.map((link) => (
-                <button key={link.href} onClick={() => scrollTo(link.href)} className="rounded-lg px-2 py-3 text-left text-base text-[#CFCFCF] hover:bg-white/5 hover:text-[#FFD76A]">
+                <a key={link.href} href={link.href} onClick={() => setMobileOpen(false)} className="rounded-lg px-2 py-3 text-left text-base text-[#CFCFCF] hover:bg-white/5 hover:text-[#FFD76A]">
                   {link.label}
-                </button>
+                </a>
               ))}
-              <button onClick={() => navigate("/login")} className="mt-2 rounded-full bg-gradient-to-r from-[#D4AF37] to-[#FFD76A] px-6 py-3 text-sm font-semibold text-[#070707]">
+              <button type="button" onClick={() => { setMobileOpen(false); navigate("/login"); }} className="mt-2 min-h-11 rounded-full bg-gradient-to-r from-[#D4AF37] to-[#FFD76A] px-6 py-3 text-sm font-semibold text-[#070707]">
                 Sign In
               </button>
             </div>

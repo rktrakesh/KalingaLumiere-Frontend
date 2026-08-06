@@ -5,7 +5,7 @@ interface ThemeState { isDark: boolean; toggle: () => void; setDark: (v: boolean
 
 export const useThemeStore = create<ThemeState>()(persist(
   (set, get) => ({
-    isDark: false,
+    isDark: true,
     toggle:  () => { const n = !get().isDark; set({ isDark: n }); document.documentElement.classList.toggle('dark', n); },
     setDark: (v) => { set({ isDark: v }); document.documentElement.classList.toggle('dark', v); },
   }),

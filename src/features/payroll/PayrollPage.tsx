@@ -61,8 +61,8 @@ function generatePayslipHTML(detail: PayrollDetail, run: PayrollRun, companyName
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: Arial, sans-serif; font-size: 12px; color: #1a1a1a; background: #fff; padding: 20px; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #444ce7; padding-bottom: 14px; margin-bottom: 18px; }
-  .company-name { font-size: 20px; font-weight: 800; color: #444ce7; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #b9821f; padding-bottom: 14px; margin-bottom: 18px; }
+  .company-name { font-size: 20px; font-weight: 800; color: #93621b; }
   .company-sub  { font-size: 11px; color: #666; margin-top: 3px; }
   .slip-title   { text-align: right; }
   .slip-title h2 { font-size: 16px; font-weight: 700; color: #1a1a1a; }
@@ -71,11 +71,11 @@ function generatePayslipHTML(detail: PayrollDetail, run: PayrollRun, companyName
   .info-item label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 2px; }
   .info-item span  { font-size: 13px; font-weight: 600; color: #1a1a1a; }
   table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
-  th { background: #444ce7; color: #fff; padding: 8px 12px; text-align: left; font-size: 11px; font-weight: 600; letter-spacing: 0.4px; }
+  th { background: #b9821f; color: #080a0b; padding: 8px 12px; text-align: left; font-size: 11px; font-weight: 600; letter-spacing: 0.4px; }
   td { padding: 7px 12px; border-bottom: 1px solid #f0f0f0; font-size: 12px; }
   tr:nth-child(even) td { background: #fafafa; }
-  .total-row td { font-weight: 700; font-size: 13px; color: #444ce7; border-top: 2px solid #444ce7; background: #f0f2ff !important; }
-  .net-box { background: #444ce7; color: #fff; border-radius: 8px; padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+  .total-row td { font-weight: 700; font-size: 13px; color: #93621b; border-top: 2px solid #b9821f; background: #fffaf0 !important; }
+  .net-box { background: #dca62f; color: #080a0b; border-radius: 8px; padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
   .net-box .label { font-size: 13px; opacity: 0.85; }
   .net-box .value { font-size: 22px; font-weight: 800; }
   .footer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 12px; }
@@ -448,8 +448,8 @@ function RunActionSummary({ run }: { run: PayrollRun }) {
   return (
     <div className="mb-5 space-y-3">
       {run.metrics && (
-        <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
-          <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-2 uppercase tracking-wide">Last Computation Summary</p>
+        <div className="p-4 rounded-xl bg-brand-50 dark:bg-brand-950/30 border border-brand-200 dark:border-brand-800">
+          <p className="text-xs font-semibold text-brand-700 dark:text-brand-300 mb-2 uppercase tracking-wide">Last Computation Summary</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
             <div>
               <p className="text-gray-400 text-xs">Processed</p>
@@ -792,7 +792,7 @@ export default function PayrollPage() {
       {!selectedRun && (
         <>
           {runs.length > 0 && (
-            <div className="grid grid-cols-3 gap-4 mb-5">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-5">
               <KPICard title="Latest Employees" value={runs[0]?.totalEmployees ?? 0} icon={<Users size={18} />} color="blue" index={0} />
               <KPICard title="Latest Gross" value={formatCurrency(runs[0]?.totalGross ?? 0)} icon={<TrendingDown size={18} />} color="orange" index={1} />
               <KPICard title="Latest Net Payout" value={formatCurrency(runs[0]?.totalNet ?? 0)} icon={<IndianRupee size={18} />} color="green" index={2} />
@@ -1087,7 +1087,7 @@ export default function PayrollPage() {
                     <span className="text-gray-600 dark:text-gray-400">
                       Weekly Off Pay ({payslipView.weeklyOffWorkedDays} day(s) worked × {payslipView.weeklyOffMultiplier}x)
                     </span>
-                    <span className="font-medium text-blue-600">{formatCurrency(payslipView.weeklyOffPay)}</span>
+                    <span className="font-medium text-brand-600">{formatCurrency(payslipView.weeklyOffPay)}</span>
                   </div>
                 )}
                 {payslipView.holidayOtPay > 0 && (

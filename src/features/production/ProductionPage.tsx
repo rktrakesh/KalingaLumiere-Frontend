@@ -100,9 +100,9 @@ export default function ProductionPage() {
       <Modal isOpen={!!completeBatch} onClose={() => setCompleteBatch(null)} title={`Complete Batch — ${completeBatch?.batchNumber}`} size="lg"
         footer={<><Button variant="outline" onClick={() => setCompleteBatch(null)}>Cancel</Button><Button loading={completeM.isPending} icon={<CheckCircle size={14}/>} onClick={() => completeM.mutate()}>Mark Complete</Button></>}>
         <div className="space-y-4">
-          <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-sm">
-            <p className="font-medium text-blue-700 dark:text-blue-300 mb-1">Input Summary</p>
-            {completeBatch?.inputs.map((inp, i) => <p key={i} className="text-blue-600 dark:text-blue-400">{inp.materialName}: {inp.quantityUsed}</p>)}
+          <div className="p-3 rounded-lg bg-brand-50 dark:bg-brand-950/30 border border-brand-200 dark:border-brand-800 text-sm">
+            <p className="font-medium text-brand-700 dark:text-brand-300 mb-1">Input Summary</p>
+            {completeBatch?.inputs.map((inp, i) => <p key={i} className="text-brand-600 dark:text-brand-400">{inp.materialName}: {inp.quantityUsed}</p>)}
           </div>
           <div>
             <div className="flex items-center justify-between mb-2"><label className="text-sm font-medium text-gray-700 dark:text-gray-300">Output (Finished Goods) *</label><Button size="sm" variant="outline" icon={<Plus size={13}/>} onClick={() => setOutputs(p => [...p, { materialId: '', finishedQuantity: '', wasteQuantity: '' }])}>Add</Button></div>

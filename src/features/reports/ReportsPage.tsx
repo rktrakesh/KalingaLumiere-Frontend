@@ -21,7 +21,7 @@ export default function ReportsPage() {
   const pl  = plData?.data?.data;
   const att = attData?.data?.data;
   const expChart = pl ? Object.entries(pl.expenseByCategory).map(([k,v]) => ({ name: k.replace(/_/g,' '), value: v })) : [];
-  const COLORS = ['#6172f3','#f04438','#10b981','#f59e0b','#8b5cf6','#06b6d4','#ec4899','#84cc16'];
+  const COLORS = ['#dca62f','#ef4444','#22c55e','#f59e0b','#a855f7','#06b6d4','#ec4899','#84cc16'];
 
   const yOpts = [currentYear()-1, currentYear()].map(y => ({ value: String(y), label: String(y) }));
   const mOpts = MONTHS.map((m,i) => ({ value: String(i+1), label: m }));
@@ -63,25 +63,25 @@ export default function ReportsPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <Card padding="md">
               <CardHeader><CardTitle>Revenue vs Expenses</CardTitle></CardHeader>
-              <ResponsiveContainer width="100%" height={200}>
+              <ResponsiveContainer width="100%" height={200} debounce={180}>
                 <BarChart data={[{name:'Revenue',v:pl?.totalRevenue??0},{name:'Expenses',v:pl?.totalExpenses??0},{name:'Profit',v:pl?.netProfit??0}]} barSize={48}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
                   <XAxis dataKey="name" tick={{fontSize:12}} />
                   <YAxis tick={{fontSize:11}} tickFormatter={v=>`₹${(v/1000).toFixed(0)}k`} />
-                  <Tooltip formatter={(v:number)=>formatCurrency(v)} contentStyle={{borderRadius:10,fontSize:12}} />
-                  <Bar dataKey="v" radius={[6,6,0,0]} fill="#6172f3" />
+                  <Tooltip formatter={(v:number)=>formatCurrency(v)} contentStyle={{backgroundColor:'#202425',border:'1px solid #4b4f50',borderRadius:6,fontSize:12}} labelStyle={{color:'#f3c65d',fontWeight:600}} itemStyle={{color:'#f5f5f4'}} />
+                  <Bar dataKey="v" radius={[6,6,0,0]} fill="#dca62f" isAnimationActive={false} />
                 </BarChart>
               </ResponsiveContainer>
             </Card>
             <Card padding="md">
               <CardHeader><CardTitle>Expense Breakdown</CardTitle></CardHeader>
               {expChart.length > 0 ? (
-                <ResponsiveContainer width="100%" height={200}>
+                <ResponsiveContainer width="100%" height={200} debounce={180}>
                   <PieChart>
-                    <Pie data={expChart} cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={3} dataKey="value" nameKey="name">
+                    <Pie data={expChart} cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={3} dataKey="value" nameKey="name" isAnimationActive={false}>
                       {expChart.map((_,i) => <Cell key={i} fill={COLORS[i%COLORS.length]} />)}
                     </Pie>
-                    <Tooltip formatter={(v:number)=>formatCurrency(v)} contentStyle={{borderRadius:10,fontSize:12}} />
+                    <Tooltip formatter={(v:number)=>formatCurrency(v)} contentStyle={{backgroundColor:'#202425',border:'1px solid #4b4f50',borderRadius:6,fontSize:12}} labelStyle={{color:'#f3c65d',fontWeight:600}} itemStyle={{color:'#f5f5f4'}} />
                     <Legend iconSize={10} wrapperStyle={{fontSize:11}} />
                   </PieChart>
                 </ResponsiveContainer>

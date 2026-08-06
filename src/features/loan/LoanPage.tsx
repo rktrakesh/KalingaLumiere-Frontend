@@ -225,7 +225,7 @@ export default function LoanPage() {
 
           <Textarea label="Remarks" placeholder="Reason for loan (optional)" {...form.register("remarks")} />
 
-          <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-300">
+          <div className="p-3 rounded-lg bg-brand-50 dark:bg-brand-950/30 border border-brand-200 dark:border-brand-800 text-xs text-brand-700 dark:text-brand-300">
             <strong>Note:</strong> Only one active loan is allowed per employee. This loan will be created in <strong>PENDING_APPROVAL</strong> status. Once approved, the principal will be disbursed and interest will be calculated using simple interest.
           </div>
         </div>

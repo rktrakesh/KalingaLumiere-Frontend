@@ -41,6 +41,7 @@ const CATEGORY_META: Record<SettingCategory, CategoryMeta> = {
 };
 
 const CATEGORY_ORDER: SettingCategory[] = ["ORGANIZATION", "EMPLOYEE_HR", "ATTENDANCE", "LEAVE", "PAYROLL", "PERFORMANCE_INCENTIVE", "PRODUCTION", "INVENTORY", "NOTIFICATIONS", "SECURITY_IAM", "FINANCE", "SYSTEM"];
+const PUBLIC_BRANDING_KEYS = new Set(["COMPANY_NAME", "COMPANY_SHORT_NAME", "COMPANY_LOGO_URL", "COMPANY_ADDRESS", "COMPANY_PHONE", "COMPANY_EMAIL", "COMPANY_WEBSITE"]);
 
 const META: Record<string, SettingMeta> = {
   PAID_LEAVES_PER_MONTH: { label: "Paid Leaves Per Month", description: "Monthly paid leave entitlement per employee", unit: "days" },
@@ -131,6 +132,7 @@ export default function SettingsPage() {
     onSuccess: (response, vars) => {
       toast.success(response.data.data.message);
       qc.invalidateQueries({ queryKey: ["settings"] });
+      if (PUBLIC_BRANDING_KEYS.has(vars.key)) qc.invalidateQueries({ queryKey: ["public-branding"] });
       setEditValues((prev) => {
         const n = { ...prev };
         delete n[vars.key];
