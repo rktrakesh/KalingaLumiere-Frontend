@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, User, Phone, MapPin, Calendar, Briefcase, IndianRupee } from "lucide-react";
+import { ArrowLeft, User, Phone, MapPin, Calendar, Briefcase, IndianRupee, Target } from "lucide-react";
 import { employeesApi } from "@/services/api/employees.api";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge, statusBadge } from "@/components/ui/Badge";
@@ -9,10 +10,12 @@ import { DataTable, Column } from "@/components/common/DataTable";
 import { SalaryHistory } from "@/types";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { PerformanceTargetsPanel } from "./PerformanceTargetsPanel";
 
 export default function EmployeeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [activeSection, setActiveSection] = useState<"overview" | "performance">("overview");
   const empId = Number(id);
   const { data: empData, isLoading } = useQuery({ queryKey: ["employee", empId], queryFn: () => employeesApi.getById(empId), enabled: !!empId });
   const { data: histData } = useQuery({ queryKey: ["emp-sal-hist", empId], queryFn: () => employeesApi.getSalaryHistory(empId), enabled: !!empId });
@@ -35,6 +38,7 @@ export default function EmployeeDetailPage() {
       </div>
     );
   if (!emp) return <div className="text-center py-20 text-gray-400">Employee not found</div>;
+  const isSalesEmployee = emp.employeeCategoryCode === "SALES";
 
   return (
     <div>
@@ -50,6 +54,15 @@ export default function EmployeeDetailPage() {
           {emp.status}
         </Badge>
       </div>
+
+      {isSalesEmployee && (
+        <div className="mb-5 flex gap-1 border-b border-gray-200 dark:border-gray-700" role="tablist" aria-label="Employee details">
+          <button type="button" role="tab" aria-selected={activeSection === "overview"} onClick={() => setActiveSection("overview")} className={`border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${activeSection === "overview" ? "border-brand-500 text-brand-600 dark:text-brand-400" : "border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-white"}`}>Overview</button>
+          <button type="button" role="tab" aria-selected={activeSection === "performance"} onClick={() => setActiveSection("performance")} className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${activeSection === "performance" ? "border-brand-500 text-brand-600 dark:text-brand-400" : "border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-white"}`}><Target size={15} />Performance &amp; Targets</button>
+        </div>
+      )}
+
+      {activeSection === "overview" || !isSalesEmployee ? <>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
         <Card padding="md" className="md:col-span-2">
           <CardHeader>
@@ -100,6 +113,7 @@ export default function EmployeeDetailPage() {
         </CardHeader>
         <DataTable columns={histCols} data={history} rowKey={(h) => h.id} emptyMessage="No salary history" />
       </Card>
+      </> : <PerformanceTargetsPanel employeeId={emp.id} employeeName={emp.name} />}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import axiosInstance from "@/services/interceptors/axiosInstance";
-import { ApiResponse, EmployeePerformanceDashboard, ManagementPerformanceDashboard } from "@/types";
+import { ApiResponse, CreateSalesPolicyRequest, EmployeePerformanceDashboard, ManagementPerformanceDashboard, SalesPolicy } from "@/types";
 
 export interface PerformancePeriodParams {
   year?: number;
@@ -12,4 +12,8 @@ export const performanceApi = {
   getEmployeeDashboard: (employeeId: number, params?: PerformancePeriodParams) => axiosInstance.get<ApiResponse<EmployeePerformanceDashboard>>(`/performance/employee/${employeeId}`, { params }),
 
   getManagementDashboard: (params?: PerformancePeriodParams) => axiosInstance.get<ApiResponse<ManagementPerformanceDashboard>>("/performance/dashboard", { params }),
+
+  createSalesPolicy: (data: CreateSalesPolicyRequest) => axiosInstance.post<ApiResponse<SalesPolicy>>("/performance/sales-policies", data),
+
+  getSalesPolicyHistory: (employeeId: number) => axiosInstance.get<ApiResponse<SalesPolicy[]>>(`/performance/sales-policies/employee/${employeeId}/history`),
 };

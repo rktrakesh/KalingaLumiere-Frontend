@@ -86,6 +86,9 @@ export interface Employee {
   address?: string;
   joiningDate: string;
   designation?: string;
+  employeeCategoryId?: number;
+  employeeCategoryCode?: EmployeeCategory;
+  employeeCategoryName?: string;
   currentSalary: number;
   status: "ACTIVE" | "INACTIVE";
   createdBy?: string;
@@ -720,4 +723,31 @@ export interface ManagementPerformanceDashboard {
   totalCollectionsPending: number;
   totalMonthlySales: number;
   totalIncentivePayout: number;
+}
+
+export interface IncentiveSlab {
+  id?: number;
+  minAchievementPct: number;
+  maxAchievementPct?: number | null;
+  incentivePct: number;
+  slabOrder: number;
+}
+
+export interface SalesPolicy {
+  id: number;
+  employeeId: number;
+  employeeName: string;
+  monthlyTarget: number;
+  effectiveFrom: string;
+  effectiveTo?: string | null;
+  version: number;
+  status: "ACTIVE" | "SUPERSEDED";
+  slabs: IncentiveSlab[];
+}
+
+export interface CreateSalesPolicyRequest {
+  employeeId: number;
+  monthlyTarget: number;
+  effectiveFrom: string;
+  slabs: Omit<IncentiveSlab, "id">[];
 }
