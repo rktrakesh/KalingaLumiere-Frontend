@@ -30,16 +30,53 @@ export interface TokenResponse {
   username: string;
   fullName: string;
   role: UserRole;
+  roles: UserRole[];
+  /** True right after onboarding or an admin-triggered reset — frontend must route
+   *  straight to Change Password and nowhere else until it's changed. */
+  mustChangePassword?: boolean;
 }
 export interface UserProfile {
   id: number;
   username: string;
   fullName: string;
   role: UserRole;
+  roles: UserRole[];
   employeeId?: number;
-  status: string;
+  status: UserStatus;
+  mustChangePassword?: boolean;
+  credentialsExpired?: boolean;
+  failedLoginAttempts: number;
+  lockedAt?: string | null;
+  lastLoginAt?: string | null;
+  temporaryPasswordIssuedAt?: string | null;
+  temporaryPasswordExpiresAt?: string | null;
+  enabled: boolean;
+  accountNonLocked: boolean;
+  /** Null for users with no linked Employee (e.g. a system ADMIN account). Drives
+   *  Role-Based Dashboard Routing (see utils/routing.ts). */
+  employeeCategory?: EmployeeCategory | null;
 }
-export type UserRole = "ROLE_ADMIN" | "ROLE_MANAGER" | "ROLE_SUPERVISOR" | "ROLE_EMPLOYEE";
+export type AuthenticatedUser = UserProfile;
+export type UserProfileResponse = UserProfile;
+export type IAMUser = UserProfile;
+export type UserRole = "ROLE_ADMIN" | "ROLE_MANAGER" | "ROLE_SUPERVISOR" | "ROLE_HR" | "ROLE_FINANCE" | "ROLE_SALES" | "ROLE_EMPLOYEE";
+export type UserStatus = "ACTIVE" | "INACTIVE" | "LOCKED";
+export type EmployeeCategory = "FACTORY" | "SALES" | "ADMINISTRATION";
+
+export interface TemporaryPasswordResetResponse {
+  temporaryPassword: string;
+  temporaryPasswordExpiresAt: string;
+  mustChangePassword: boolean;
+  emailDeliveryAttempted: boolean;
+}
+
+export interface ForgotPasswordRequest {
+  email: string;
+}
+export interface ResetPasswordRequest {
+  token: string;
+  newPassword: string;
+}
 
 export interface Employee {
   id: number;
@@ -49,19 +86,42 @@ export interface Employee {
   address?: string;
   joiningDate: string;
   designation?: string;
+  employeeCategoryId?: number;
+  employeeCategoryCode?: EmployeeCategory;
+  employeeCategoryName?: string;
   currentSalary: number;
-  status: "ACTIVE" | "INACTIVE";
+  status: EmployeeStatus;
+  allowedNextStatuses: EmployeeStatus[];
+  noticeStartDate?: string | null;
+  lastWorkingDate?: string | null;
   createdBy?: string;
   createdDate?: string;
 }
 export interface CreateEmployeeRequest {
+  createLogin: boolean;
+  status: "DRAFT" | "ACTIVE";
   name: string;
   phone?: string;
   address?: string;
+  email?: string;
   joiningDate: string;
-  designation?: string;
+  designationId: number;
+  departmentId?: number;
+  employeeCategoryId: number;
   currentSalary: number;
   salaryRemarks?: string;
+}
+export interface EmployeeMasterData {
+  id: number;
+  code: string;
+  name: string;
+  description?: string;
+  active: boolean;
+}
+export interface DesignationMasterData extends EmployeeMasterData {
+  categoryId: number;
+  categoryCode: string;
+  categoryName: string;
 }
 export interface SalaryHistory {
   id: number;
@@ -522,13 +582,39 @@ export interface Notification {
   createdDate: string;
   readDate?: string;
 }
-export interface AppSetting {
+export type SettingUpdateMode = "IMMEDIATE" | "SCHEDULED";
+
+/** Mirrors the backend SettingResponse, including its temporary settingValue alias. */
+export interface SettingResponse {
   id: number;
   settingKey: string;
+  settingCategory: SettingCategory;
+  dataType: string;
+  editable: boolean;
+  description: string;
+  /** Compatibility alias for activeValue. */
   settingValue: string;
-  description?: string;
-  effectiveFromDate: string;
+  activeValue: string;
+  activeEffectiveFromDate: string;
+  pendingValue: string | null;
+  pendingEffectiveDate: string | null;
+  pendingStatus: string | null;
+  updateMode: SettingUpdateMode;
+  /** Compatibility alias retained while older clients migrate. */
+  effectiveFromDate?: string;
 }
+
+/** Backwards-compatible name used by existing settings UI code. */
+export type AppSetting = SettingResponse;
+
+export interface SettingUpdateResult {
+  setting: SettingResponse;
+  updateMode: SettingUpdateMode;
+  replacedExistingPending: boolean;
+  message: string;
+}
+
+export type SettingCategory = "ORGANIZATION" | "EMPLOYEE_HR" | "ATTENDANCE" | "LEAVE" | "PAYROLL" | "PERFORMANCE_INCENTIVE" | "PRODUCTION" | "INVENTORY" | "NOTIFICATIONS" | "SECURITY_IAM" | "FINANCE" | "SYSTEM";
 
 export interface MonthClosing {
   id?: number;
@@ -595,4 +681,117 @@ export interface AttendanceReport {
   month: number;
   totalEmployees: number;
   employees: { employeeId: number; employeeCode: string; employeeName: string; presentDays: number; absentDays: number; paidLeaveDays: number; holidayDays: number; totalWorkedMinutes: number }[];
+}
+
+// ---------------------------------------------------------------- Performance Engine
+export interface EmployeePerformanceDashboard {
+  employeeId: number;
+  employeeName: string;
+  periodYear: number;
+  periodMonth: number;
+  monthlyTarget: number;
+  monthlySales: number;
+  achievementPct: number;
+  incentiveEarned: number;
+  assignedCustomers: number;
+  activeCustomers: number;
+  inactiveCustomers: number;
+  ordersThisMonth: number;
+  averageOrderValue: number;
+  collectionPending: number;
+  newCustomers: number;
+  repeatCustomers: number;
+  largestOrder: number;
+  recommendationLabel: string;
+  recommendationSuggestion?: string;
+}
+export interface PerformanceRankingEntry {
+  employeeId: number;
+  employeeName: string;
+  monthlyTarget: number;
+  monthlySales: number;
+  achievementPct: number;
+  incentiveEarned: number;
+  recommendationLabel: string;
+}
+export interface ManagementPerformanceDashboard {
+  periodYear: number;
+  periodMonth: number;
+  topPerformers: PerformanceRankingEntry[];
+  lowestPerformers: PerformanceRankingEntry[];
+  targetAchievementRanking: PerformanceRankingEntry[];
+  monthlySalesRanking: PerformanceRankingEntry[];
+  totalAssignedCustomers: number;
+  totalActiveCustomers: number;
+  totalInactiveCustomers: number;
+  totalCollectionsPending: number;
+  totalMonthlySales: number;
+  totalIncentivePayout: number;
+}
+export type EmployeeStatus = "DRAFT" | "ACTIVE" | "ON_NOTICE" | "RESIGNED" | "INACTIVE";
+export interface ChangeEmployeeStatusRequest {
+  targetStatus: EmployeeStatus;
+  reason?: string;
+  noticeStartDate?: string;
+  lastWorkingDate?: string;
+}
+export type EmployeeDocumentType =
+  | "PROFILE_PHOTO"
+  | "IDENTITY_PROOF"
+  | "PAN"
+  | "BANK_PROOF"
+  | "CERTIFICATE"
+  | "DRIVING_LICENSE"
+  | "APPOINTMENT_LETTER"
+  | "SALARY_SLIP_ACKNOWLEDGEMENT";
+export type EmployeeDocumentStatus = "CURRENT" | "SUPERSEDED" | "ARCHIVED";
+export interface EmployeeDocument {
+  id: number;
+  employeeId: number;
+  documentType: EmployeeDocumentType;
+  originalFileName: string;
+  mimeType: string;
+  fileSize: number;
+  expiryDate?: string | null;
+  status: EmployeeDocumentStatus;
+  uploadedBy?: string;
+  uploadedAt: string;
+  required: boolean;
+  canManage: boolean;
+  canView: boolean;
+  canDownload: boolean;
+}
+export interface EmployeeDocumentList {
+  employeeId: number;
+  canManage: boolean;
+  requiredDocumentTypes: EmployeeDocumentType[];
+  supportedDocumentTypes: EmployeeDocumentType[];
+  documents: EmployeeDocument[];
+}
+
+export interface IncentiveSlab {
+  id?: number;
+  minAchievementPct: number;
+  maxAchievementPct?: number | null;
+  incentivePct: number;
+  slabOrder: number;
+}
+
+export interface SalesPolicy {
+  id: number;
+  employeeId: number;
+  employeeName: string;
+  monthlyTarget: number;
+  effectiveFrom: string;
+  effectiveTo?: string | null;
+  version: number;
+  status: "ACTIVE" | "SUPERSEDED";
+  slabs: IncentiveSlab[];
+}
+
+export interface CreateSalesPolicyRequest {
+  employeeId: number;
+  monthlyTarget: number;
+  effectiveFrom: string;
+  slabs: Omit<IncentiveSlab, "id">[];
 }

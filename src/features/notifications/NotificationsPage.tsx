@@ -13,7 +13,7 @@ import { cn } from '@/utils/cn';
 
 const TYPE_COLORS: Record<string, string> = {
   PENDING_OT_APPROVAL:    'bg-amber-400',
-  PENDING_LOAN_APPROVAL:  'bg-blue-400',
+  PENDING_LOAN_APPROVAL:  'bg-brand-400',
   PENDING_LEAVE_APPROVAL: 'bg-green-400',
   FORGOTTEN_CHECKOUT:     'bg-red-400',
   LOW_INVENTORY:          'bg-orange-400',

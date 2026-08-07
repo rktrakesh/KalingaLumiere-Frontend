@@ -27,6 +27,400 @@
   }
 }
 
+@layer components {
+  .erp-shell {
+    --erp-canvas: #f4f3ef;
+    --erp-panel: #ffffff;
+    --erp-panel-raised: #faf9f6;
+    --erp-border: #dedbd2;
+    --erp-border-strong: #c7c1b4;
+    --erp-muted: #6e6a62;
+    --erp-gold: #dca62f;
+    --erp-gold-soft: rgba(220, 166, 47, 0.12);
+    color-scheme: light;
+    background: var(--erp-canvas);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  .dark .erp-shell {
+    --erp-canvas: #07090a;
+    --erp-panel: #0d0f10;
+    --erp-panel-raised: #121516;
+    --erp-border: #292c2d;
+    --erp-border-strong: #3a3d3e;
+    --erp-muted: #979b9d;
+    color-scheme: dark;
+  }
+
+  .erp-main {
+    background-color: var(--erp-canvas);
+    background-image:
+      linear-gradient(rgba(124, 119, 105, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124, 119, 105, 0.035) 1px, transparent 1px),
+      radial-gradient(circle at 82% -10%, rgba(220, 166, 47, 0.08), transparent 28rem);
+    background-size: 32px 32px, 32px 32px, auto;
+  }
+
+  .erp-sidebar,
+  .erp-topbar {
+    background: color-mix(in srgb, var(--erp-panel) 96%, transparent);
+    border-color: var(--erp-border);
+  }
+
+  .erp-sidebar {
+    box-shadow: 14px 0 36px -28px rgba(0, 0, 0, 0.8);
+  }
+
+  @media (min-width: 768px) {
+    .erp-sidebar {
+      transition: width 180ms cubic-bezier(0.22, 1, 0.36, 1);
+      will-change: width;
+    }
+
+    .erp-sidebar-label {
+      animation: erp-sidebar-label-in 140ms 45ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .erp-sidebar-label-out {
+      animation: erp-sidebar-label-out 90ms ease-in both;
+    }
+  }
+
+  @keyframes erp-sidebar-label-in {
+    from {
+      opacity: 0;
+      transform: translateX(-5px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes erp-sidebar-label-out {
+    from {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateX(-4px);
+    }
+  }
+
+  .erp-sidebar-brand {
+    border-color: var(--erp-border);
+  }
+
+  .erp-brand-mark {
+    box-shadow: 0 0 24px rgba(220, 166, 47, 0.13);
+  }
+
+  .erp-brand-name {
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .erp-nav a,
+  .erp-nav button {
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+  }
+
+  .dark .erp-nav a.bg-brand-600 {
+    background: linear-gradient(90deg, rgba(220, 166, 47, 0.2), rgba(220, 166, 47, 0.07));
+    color: #f3c65d;
+    box-shadow: inset 2px 0 #dca62f;
+  }
+
+  .dark .erp-nav button.bg-brand-50,
+  .dark .erp-nav button.dark\:bg-brand-900\/30 {
+    background: rgba(220, 166, 47, 0.08);
+    color: #e7b84f;
+  }
+
+  .erp-card,
+  .erp-kpi-card,
+  .erp-mobile-record,
+  .erp-popover,
+  .modal-panel {
+    border-color: var(--erp-border);
+    background: var(--erp-panel);
+  }
+
+  .dark .erp-card,
+  .dark .erp-kpi-card,
+  .dark .erp-mobile-record,
+  .dark .erp-popover,
+  .dark .modal-panel {
+    background: linear-gradient(145deg, var(--erp-panel-raised), var(--erp-panel));
+  }
+
+  .erp-kpi-card {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .erp-kpi-card::before {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 2px;
+    content: "";
+    background: linear-gradient(180deg, var(--erp-gold), transparent 88%);
+  }
+
+  .erp-table {
+    border-color: var(--erp-border);
+    background: var(--erp-panel);
+  }
+
+  .erp-table thead {
+    background: var(--erp-panel-raised);
+  }
+
+  .erp-table th {
+    color: var(--erp-muted);
+    font-size: 0.625rem;
+    letter-spacing: 0.09em;
+  }
+
+  .erp-table td {
+    font-size: 0.75rem;
+  }
+
+  .erp-shell input,
+  .erp-shell select,
+  .erp-shell textarea {
+    border-color: var(--erp-border-strong);
+    background: var(--erp-panel);
+  }
+
+  .erp-shell input:focus,
+  .erp-shell select:focus,
+  .erp-shell textarea:focus {
+    border-color: var(--erp-gold);
+    box-shadow: 0 0 0 1px rgba(220, 166, 47, 0.22);
+  }
+
+  .erp-shell button,
+  .erp-shell a,
+  .erp-shell input,
+  .erp-shell select,
+  .erp-shell textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .dark .erp-shell .recharts-cartesian-grid line,
+  .dark .erp-shell .recharts-polar-grid-concentric-polygon {
+    stroke: #292c2d;
+  }
+
+  .dark .erp-shell .recharts-text {
+    fill: #929698;
+  }
+
+  .erp-shell .recharts-default-tooltip {
+    border-color: var(--erp-border-strong) !important;
+    background: var(--erp-panel-raised) !important;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+  }
+
+  .erp-shell .recharts-tooltip-label {
+    color: #b9821f !important;
+    font-weight: 600;
+  }
+
+  .erp-shell .recharts-tooltip-item,
+  .erp-shell .recharts-tooltip-item-name,
+  .erp-shell .recharts-tooltip-item-value {
+    color: #292524 !important;
+  }
+
+  .dark .erp-shell .recharts-default-tooltip {
+    border-color: #4b4f50 !important;
+    background: #202425 !important;
+  }
+
+  .dark .erp-shell .recharts-tooltip-label {
+    color: #f3c65d !important;
+  }
+
+  .dark .erp-shell .recharts-tooltip-item,
+  .dark .erp-shell .recharts-tooltip-item-name,
+  .dark .erp-shell .recharts-tooltip-item-value {
+    color: #f5f5f4 !important;
+  }
+
+  .dark .erp-shell .erp-sidebar,
+  .dark .erp-shell .erp-topbar {
+    background: rgba(9, 11, 12, 0.98);
+    border-color: var(--erp-border);
+  }
+
+  .dark .erp-shell .erp-card,
+  .dark .erp-shell .erp-kpi-card,
+  .dark .erp-shell .erp-mobile-record,
+  .dark .erp-shell .erp-popover,
+  .dark .erp-shell .modal-panel {
+    background: linear-gradient(145deg, var(--erp-panel-raised), var(--erp-panel));
+    border-color: var(--erp-border);
+  }
+
+  .dark .erp-shell input,
+  .dark .erp-shell select,
+  .dark .erp-shell textarea {
+    border-color: var(--erp-border-strong);
+    background: #0a0c0d;
+  }
+
+  .erp-shell main .bg-brand-600.text-white {
+    color: #080a0b;
+  }
+
+  /* Keep the authenticated workspace neutral charcoal + gold even when a
+     running dev server has not reloaded the Tailwind configuration yet. */
+  .erp-shell .bg-brand-500,
+  .erp-shell .bg-brand-600 {
+    background-color: #dca62f !important;
+    color: #080a0b !important;
+  }
+
+  .erp-shell .hover\:bg-brand-400:hover,
+  .erp-shell .hover\:bg-brand-700:hover {
+    background-color: #edb63e !important;
+  }
+
+  .erp-shell .text-brand-200,
+  .erp-shell .text-brand-300,
+  .erp-shell .text-brand-400,
+  .erp-shell .text-brand-600,
+  .erp-shell .text-brand-700,
+  .erp-shell .text-brand-800,
+  .dark .erp-shell .dark\:text-brand-300,
+  .dark .erp-shell .dark\:text-brand-400 {
+    color: #e7b84f !important;
+  }
+
+  .erp-shell .bg-brand-50,
+  .erp-shell .bg-brand-50\/50,
+  .dark .erp-shell .dark\:bg-brand-900\/30,
+  .dark .erp-shell .dark\:bg-brand-950\/20,
+  .dark .erp-shell .dark\:bg-brand-950\/30,
+  .dark .erp-shell .dark\:bg-brand-950\/40 {
+    background-color: rgba(220, 166, 47, 0.11) !important;
+  }
+
+  .erp-shell .border-brand-200,
+  .erp-shell .border-brand-500,
+  .erp-shell .border-brand-600,
+  .erp-shell .border-brand-800,
+  .dark .erp-shell .dark\:border-brand-800 {
+    border-color: rgba(220, 166, 47, 0.42) !important;
+  }
+
+  .erp-shell .from-brand-400,
+  .erp-shell .from-brand-500,
+  .erp-shell .from-brand-600 {
+    --tw-gradient-from: #dca62f var(--tw-gradient-from-position) !important;
+    --tw-gradient-to: rgba(220, 166, 47, 0) var(--tw-gradient-to-position) !important;
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+  }
+
+  .erp-shell .to-brand-700 {
+    --tw-gradient-to: #93621b var(--tw-gradient-to-position) !important;
+  }
+
+  .dark .erp-shell .dark\:bg-gray-950 {
+    background-color: #07090a !important;
+  }
+
+  .dark .erp-shell .dark\:bg-gray-900,
+  .dark .erp-shell .dark\:bg-gray-850 {
+    background-color: #0a0c0d !important;
+  }
+
+  .dark .erp-shell .dark\:bg-gray-800,
+  .dark .erp-shell .dark\:bg-gray-800\/60,
+  .dark .erp-shell .dark\:bg-gray-800\/70,
+  .dark .erp-shell .dark\:bg-gray-800\/50 {
+    background-color: #111415 !important;
+  }
+
+  .dark .erp-shell .dark\:bg-gray-700 {
+    background-color: #1a1d1e !important;
+  }
+
+  .dark .erp-shell .erp-table thead {
+    background: #121516 !important;
+  }
+
+  .dark .erp-shell .erp-table tbody {
+    background: #0d0f10 !important;
+  }
+
+  .dark .erp-shell .erp-table tbody tr:hover {
+    background: #151819 !important;
+  }
+}
+
+@media (max-width: 639px) {
+  .erp-main {
+    background-size: 24px 24px, 24px 24px, auto;
+  }
+
+  .erp-page-actions > * {
+    flex: 1 1 auto;
+  }
+
+  .erp-page-actions > div {
+    width: 100%;
+  }
+
+  .erp-page-actions button {
+    flex: 1 1 auto;
+  }
+
+  .modal-panel .grid-cols-2,
+  .modal-panel .grid-cols-3,
+  .modal-panel .grid-cols-12 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .modal-panel .grid-cols-5 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .modal-panel [class*="col-span-"] {
+    grid-column: 1 / -1;
+  }
+
+  .modal-panel .modal-footer > * {
+    max-width: 100%;
+  }
+
+  .erp-card > .flex.items-start.justify-between {
+    flex-direction: column;
+  }
+
+  .erp-card .grid-cols-2,
+  .erp-card .grid-cols-3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .erp-card > .flex.items-start.justify-between > .text-right {
+    width: 100%;
+    text-align: left;
+  }
+
+  .erp-mobile-record button {
+    min-height: 2rem;
+  }
+
+  .dashboard-panel .dashboard-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* Respect the OS-level reduced-motion preference across the whole app,
    including the Kalinga Lumière landing page's decorative animations. */
 @media (prefers-reduced-motion: reduce) {

@@ -4,9 +4,10 @@ import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Users, Plus, Eye, UserX, DollarSign, CalendarDays } from "lucide-react";
+import { Users, Plus, Eye, CalendarDays, IndianRupee } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { employeesApi } from "@/services/api/employees.api";
+import { employeeMastersApi } from "@/services/api/employeeMasters.api";
 import { Employee } from "@/types";
 import { DataTable, Column } from "@/components/common/DataTable";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -14,14 +15,20 @@ import { SearchFilter } from "@/components/common/SearchFilter";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
 import { Badge, statusBadge } from "@/components/ui/Badge";
 import { useToast } from "@/hooks/useToast";
 import { useDebounce } from "@/hooks/useDebounce";
 import { usePagination } from "@/hooks/usePagination";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { EmployeeCalendarModal } from "./EmployeeCalendarModal";
+import { getApiErrorMessage } from "@/utils/apiError";
+import { useAuthStore } from "@/store/authStore";
+import { hasAnyRole, hasRole } from "@/utils/authorization";
 
 const createSchema = z.object({
+  createLogin: z.preprocess((value) => value === true || value === "true", z.boolean()),
+  status: z.enum(["DRAFT", "ACTIVE"]),
   name: z.string().min(2, "Name required"),
   phone: z
     .string()
@@ -29,8 +36,11 @@ const createSchema = z.object({
     .optional()
     .or(z.literal("")),
   address: z.string().optional(),
+  email: z.string().email("Enter a valid email").optional().or(z.literal("")),
   joiningDate: z.string().min(1, "Joining date required"),
-  designation: z.string().optional(),
+  employeeCategoryId: z.coerce.number().positive("Employee category required"),
+  designationId: z.coerce.number().positive("Designation required"),
+  departmentId: z.preprocess((value) => value === "" ? undefined : value, z.coerce.number().positive().optional()),
   currentSalary: z.coerce.number().positive("Salary must be positive"),
   salaryRemarks: z.string().optional(),
 });
@@ -48,6 +58,10 @@ export default function EmployeesPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const toast = useToast();
+  const user = useAuthStore((state) => state.user);
+  const isAdmin = hasRole(user, "ROLE_ADMIN");
+  const canCreateEmployee = hasAnyRole(user, ["ROLE_ADMIN", "ROLE_HR"]);
+  const canViewAttendanceCalendar = isAdmin || hasRole(user, "ROLE_MANAGER");
   const { page, size, goToPage } = usePagination();
 
   const [search, setSearch] = useState("");
@@ -65,8 +79,12 @@ export default function EmployeesPage() {
   const pageData = data?.data?.data;
   const employees = pageData?.content ?? [];
 
-  const cForm = useForm<CreateForm>({ resolver: zodResolver(createSchema) });
+  const cForm = useForm<CreateForm>({ resolver: zodResolver(createSchema), defaultValues: { createLogin: false, status: "DRAFT" } });
+  const selectedCategoryId = cForm.watch("employeeCategoryId");
   const sForm = useForm<SalaryForm>({ resolver: zodResolver(salarySchema) });
+  const categoriesQuery = useQuery({ queryKey: ["employee-categories", "active"], queryFn: () => employeeMastersApi.getEmployeeCategories(), enabled: showCreate });
+  const departmentsQuery = useQuery({ queryKey: ["departments", "active"], queryFn: () => employeeMastersApi.getDepartments(), enabled: showCreate });
+  const designationsQuery = useQuery({ queryKey: ["designations", selectedCategoryId || "all"], queryFn: () => employeeMastersApi.getDesignations(selectedCategoryId || undefined), enabled: showCreate });
 
   const createM = useMutation({
     mutationFn: (d: CreateForm) => employeesApi.create(d),
@@ -76,16 +94,7 @@ export default function EmployeesPage() {
       setShowCreate(false);
       cForm.reset();
     },
-    onError: (e: any) => toast.error(e?.response?.data?.message ?? "Failed to create employee"),
-  });
-
-  const deactivateM = useMutation({
-    mutationFn: (id: number) => employeesApi.deactivate(id),
-    onSuccess: () => {
-      toast.success("Employee deactivated");
-      qc.invalidateQueries({ queryKey: ["employees"] });
-    },
-    onError: (e: any) => toast.error(e?.response?.data?.message ?? "Failed to deactivate"),
+    onError: (error: unknown) => toast.error(getApiErrorMessage(error, "Failed to create employee")),
   });
 
   const salaryM = useMutation({
@@ -96,20 +105,20 @@ export default function EmployeesPage() {
       setShowSalary(null);
       sForm.reset();
     },
-    onError: (e: any) => toast.error(e?.response?.data?.message ?? "Failed to update salary"),
+    onError: (error: unknown) => toast.error(getApiErrorMessage(error, "Failed to update salary")),
   });
 
   const columns: Column<Employee>[] = [
     {
       key: "code",
       header: "Code",
-      render: (e) => (
+      render: (e) => canViewAttendanceCalendar ? (
         // Clickable employee code → opens calendar
         <button onClick={() => setCalEmployee(e)} className="font-mono text-xs font-bold text-brand-600 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-200 hover:underline underline-offset-2 transition-colors flex items-center gap-1" title="Click to view attendance calendar">
           <CalendarDays size={11} />
           {e.employeeCode}
         </button>
-      ),
+      ) : <span className="font-mono text-xs font-bold text-brand-600 dark:text-brand-400">{e.employeeCode}</span>,
     },
     {
       key: "name",
@@ -133,25 +142,20 @@ export default function EmployeesPage() {
           <Button size="sm" variant="ghost" icon={<Eye size={13} />} onClick={() => navigate(`/employees/${e.id}`)}>
             View
           </Button>
-          <Button
+          {isAdmin && <Button
             size="sm"
             variant="ghost"
-            icon={<DollarSign size={13} />}
+            icon={<IndianRupee size={13} />}
             onClick={() => {
               setShowSalary(e);
               sForm.reset();
             }}
           >
             Salary
-          </Button>
-          <Button size="sm" variant="ghost" icon={<CalendarDays size={13} />} onClick={() => setCalEmployee(e)}>
+          </Button>}
+          {canViewAttendanceCalendar && <Button size="sm" variant="ghost" icon={<CalendarDays size={13} />} onClick={() => setCalEmployee(e)}>
             Calendar
-          </Button>
-          {e.status === "ACTIVE" && (
-            <Button size="sm" variant="ghost" icon={<UserX size={13} />} className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30" loading={deactivateM.isPending} onClick={() => deactivateM.mutate(e.id)}>
-              Deactivate
-            </Button>
-          )}
+          </Button>}
         </div>
       ),
     },
@@ -164,9 +168,9 @@ export default function EmployeesPage() {
         subtitle={`${pageData?.totalElements ?? 0} total employees`}
         icon={<Users size={20} />}
         actions={
-          <Button icon={<Plus size={15} />} onClick={() => setShowCreate(true)}>
+          canCreateEmployee ? <Button icon={<Plus size={15} />} onClick={() => setShowCreate(true)}>
             Add Employee
-          </Button>
+          </Button> : null
         }
       />
 
@@ -188,15 +192,18 @@ export default function EmployeesPage() {
             },
             options: [
               { value: "ACTIVE", label: "Active" },
+              { value: "DRAFT", label: "Draft" },
+              { value: "ON_NOTICE", label: "On Notice" },
+              { value: "RESIGNED", label: "Resigned" },
               { value: "INACTIVE", label: "Inactive" },
             ],
           },
         ]}
       />
 
-      <p className="text-xs text-gray-400 dark:text-gray-500 mb-3 flex items-center gap-1">
+      {canViewAttendanceCalendar && <p className="text-xs text-gray-400 dark:text-gray-500 mb-3 flex items-center gap-1">
         <CalendarDays size={11} /> Click the employee code to view attendance calendar
-      </p>
+      </p>}
 
       <DataTable columns={columns} data={employees} loading={isLoading} totalPages={pageData?.totalPages} currentPage={page} totalElements={pageData?.totalElements} pageSize={size} onPageChange={goToPage} rowKey={(e) => e.id} emptyMessage="No employees found. Add your first employee!" />
 
@@ -229,11 +236,40 @@ export default function EmployeesPage() {
         <div className="grid grid-cols-2 gap-4">
           <Input label="Full Name *" error={cForm.formState.errors.name?.message} placeholder="e.g. Ravi Kumar" {...cForm.register("name")} className="col-span-2" />
           <Input label="Phone" error={cForm.formState.errors.phone?.message} placeholder="10-digit mobile number" {...cForm.register("phone")} />
-          <Input label="Designation" placeholder="e.g. Floor Supervisor" {...cForm.register("designation")} />
+          <Input label="Email" type="email" error={cForm.formState.errors.email?.message} placeholder="employee@example.com" {...cForm.register("email")} />
+          <Select label="Employee Category *" error={cForm.formState.errors.employeeCategoryId?.message} placeholder="Select category" options={(categoriesQuery.data?.data.data ?? []).map((item) => ({ value: String(item.id), label: item.name }))} {...cForm.register("employeeCategoryId", { onChange: () => cForm.setValue("designationId", 0) })} />
+          <div className="space-y-1.5">
+            <Select
+              label="Designation *"
+              error={cForm.formState.errors.designationId?.message}
+              placeholder={designationsQuery.isLoading ? "Loading designations…" : "Select designation"}
+              disabled={designationsQuery.isLoading || designationsQuery.isError}
+              options={(designationsQuery.data?.data.data ?? []).map((item) => ({ value: String(item.id), label: selectedCategoryId ? item.name : `${item.name} — ${item.categoryName}` }))}
+              {...cForm.register("designationId", {
+                onChange: (event) => {
+                  const designation = (designationsQuery.data?.data.data ?? []).find((item) => item.id === Number(event.target.value));
+                  if (designation) cForm.setValue("employeeCategoryId", designation.categoryId, { shouldValidate: true });
+                },
+              })}
+            />
+            {designationsQuery.isError && <p className="text-xs text-red-600 dark:text-red-400">Designations could not be loaded. Close this form and try again.</p>}
+            {!designationsQuery.isLoading && !designationsQuery.isError && (designationsQuery.data?.data.data.length ?? 0) === 0 && <p className="text-xs text-amber-600 dark:text-amber-400">No active designations are configured for this category.</p>}
+          </div>
+          <Select label="Department" placeholder="No department" options={(departmentsQuery.data?.data.data ?? []).map((item) => ({ value: String(item.id), label: item.name }))} {...cForm.register("departmentId")} />
           <Input label="Joining Date *" type="date" error={cForm.formState.errors.joiningDate?.message} {...cForm.register("joiningDate")} />
+          <Select label="Initial Status" options={[{ value: "DRAFT", label: "Draft (complete documents before activation)" }, { value: "ACTIVE", label: "Active" }]} {...cForm.register("status")} />
           <Input label="Monthly Salary (₹) *" type="number" error={cForm.formState.errors.currentSalary?.message} placeholder="e.g. 15000" {...cForm.register("currentSalary")} />
           <Input label="Address" placeholder="Full address" {...cForm.register("address")} className="col-span-2" />
           <Input label="Salary Remarks" placeholder="Reason for initial salary (optional)" {...cForm.register("salaryRemarks")} className="col-span-2" />
+          <Select
+            label="Create Login"
+            options={[{ value: "false", label: "No" }, { value: "true", label: "Yes" }]}
+            {...cForm.register("createLogin")}
+            className="col-span-2"
+          />
+          <p className="col-span-2 -mt-2 text-xs text-gray-500 dark:text-gray-400">
+            Choose Yes to use the standard employee onboarding flow. Login credentials are generated by the backend; no separate account is created here.
+          </p>
         </div>
       </Modal>
 

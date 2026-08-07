@@ -1,5 +1,4 @@
 import { ReactNode } from 'react';
-import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { TableSkeleton } from '@/components/ui/Skeleton';
@@ -17,7 +16,7 @@ export function DataTable<T>({ columns, data, loading, totalPages = 1, currentPa
   };
   return (
     <div className="space-y-3">
-      <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
+      <div className="erp-table hidden overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700 md:block">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead className="bg-gray-50 dark:bg-gray-800/60">
             <tr>{columns.map(col => <th key={col.key} className={cn('px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap', col.headerClassName)}>{col.header}</th>)}</tr>
@@ -28,20 +27,40 @@ export function DataTable<T>({ columns, data, loading, totalPages = 1, currentPa
             ) : data.length === 0 ? (
               <tr><td colSpan={columns.length} className="px-4 py-12 text-center text-sm text-gray-400">{emptyMessage}</td></tr>
             ) : data.map((row, idx) => (
-              <motion.tr key={rowKey ? rowKey(row) : idx} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: idx * 0.03 }}
-                className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+              <tr key={rowKey ? rowKey(row) : idx} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors duration-100">
                 {columns.map(col => <td key={col.key} className={cn('px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap', col.className)}>{getCellValue(row, col)}</td>)}
-              </motion.tr>
+              </tr>
             ))}
           </tbody>
         </table>
       </div>
+      <div className="space-y-2 md:hidden">
+        {loading ? (
+          <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+            <TableSkeleton rows={4} cols={2} />
+          </div>
+        ) : data.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-gray-300 px-4 py-12 text-center text-sm text-gray-400 dark:border-gray-700">{emptyMessage}</div>
+        ) : data.map((row, idx) => (
+          <div
+            key={rowKey ? rowKey(row) : idx}
+            className="erp-mobile-record divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white px-3 dark:divide-gray-700/60 dark:border-gray-700 dark:bg-gray-800"
+          >
+            {columns.map(col => (
+              <div key={col.key} className="grid grid-cols-[minmax(6.5rem,0.42fr)_minmax(0,1fr)] items-start gap-3 py-2.5">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-400">{col.header}</span>
+                <div className={cn('min-w-0 break-words text-right text-sm text-gray-700 dark:text-gray-300', col.className)}>{getCellValue(row, col)}</div>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
       {totalPages > 1 && (
-        <div className="flex items-center justify-between px-1">
+        <div className="flex flex-col items-center justify-between gap-2 px-1 sm:flex-row">
           <p className="text-xs text-gray-500 dark:text-gray-400">
             {totalElements !== undefined ? `Showing ${currentPage * (pageSize||10) + 1}–${Math.min((currentPage+1)*(pageSize||10), totalElements)} of ${totalElements}` : `Page ${currentPage+1} of ${totalPages}`}
           </p>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 sm:gap-1">
             <Button variant="ghost" size="sm" onClick={() => onPageChange?.(0)} disabled={currentPage===0}><ChevronsLeft size={14}/></Button>
             <Button variant="ghost" size="sm" onClick={() => onPageChange?.(currentPage-1)} disabled={currentPage===0}><ChevronLeft size={14}/></Button>
             <span className="px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300">{currentPage+1} / {totalPages}</span>

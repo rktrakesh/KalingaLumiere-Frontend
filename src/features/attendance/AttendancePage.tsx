@@ -14,9 +14,10 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Badge, statusBadge } from "@/components/ui/Badge";
 import { useToast } from "@/hooks/useToast";
-import { usePagination } from "@/hooks/usePagination";
-import { AttendanceRecord } from "@/types";
+import { AttendanceRecord, Employee } from "@/types";
 import { formatDate, minutesToHours } from "@/utils/format";
+import { useAuthStore } from "@/store/authStore";
+import { hasAnyRole, hasRole } from "@/utils/authorization";
 
 const checkInSchema = z.object({
   employeeId: z.coerce.number().positive("Select an employee"),
@@ -35,10 +36,23 @@ const correctSchema = z.object({
 type CheckInForm = z.infer<typeof checkInSchema>;
 type CorrectForm = z.infer<typeof correctSchema>;
 
+interface AttendanceRow {
+  employeeId: number;
+  employeeCode: string;
+  employeeName: string;
+  record?: AttendanceRecord;
+}
+
 export default function AttendancePage() {
+  const { user } = useAuthStore();
+  const isAdmin = hasRole(user, "ROLE_ADMIN");
+  const isSupervisor = hasRole(user, "ROLE_SUPERVISOR");
+  const isSelfService = hasRole(user, "ROLE_EMPLOYEE")
+    && !hasAnyRole(user, ["ROLE_ADMIN", "ROLE_MANAGER", "ROLE_SUPERVISOR"]);
+  const employeeId = user?.employeeId;
+  const canRecordAttendance = isAdmin || isSupervisor || isSelfService;
   const qc = useQueryClient();
   const toast = useToast();
-  const { page, size, goToPage } = usePagination(0, 20);
 
   const today = new Date().toISOString().split("T")[0];
   const [dateFilter, setDateFilter] = useState(today);
@@ -47,40 +61,85 @@ export default function AttendancePage() {
   const [correctRecord, setCorrectRecord] = useState<AttendanceRecord | null>(null);
 
   // ── Fetch all active employees for the dropdown ──────────────────────────
-  const { data: empData } = useQuery({
+  const { data: empData, isLoading: employeesLoading } = useQuery({
     queryKey: ["employees-active"],
-    queryFn: () => employeesApi.getAll({ status: "ACTIVE", size: 200 }),
+    queryFn: () => employeesApi.getAll({ status: "ACTIVE", size: 1000 }),
+    enabled: !isSelfService,
   });
-  const employees = empData?.data?.data?.content ?? [];
-  const employeeOptions = employees.map((e: any) => ({
+  const employees: Employee[] = empData?.data?.data?.content ?? [];
+  const employeeOptions = employees.map((e) => ({
     value: String(e.id),
     label: `${e.employeeCode} — ${e.name}`,
   }));
 
   // ── Attendance records ────────────────────────────────────────────────────
-  const { data, isLoading } = useQuery({
-    queryKey: ["attendance", page, size, dateFilter, statusFilter],
+  const managementQuery = useQuery({
+    queryKey: ["attendance", "daily-roster", dateFilter],
     queryFn: () =>
       attendanceApi.search({
-        page,
-        size,
+        page: 0,
+        size: 500,
         date: dateFilter || undefined,
-        status: (statusFilter as any) || undefined,
       }),
+    enabled: !isSelfService,
+  });
+
+  const selectedDate = new Date(`${dateFilter || today}T00:00:00`);
+  const selfQuery = useQuery({
+    queryKey: ["attendance", "self", employeeId, selectedDate.getFullYear(), selectedDate.getMonth() + 1],
+    queryFn: () => attendanceApi.getMonthly(employeeId!, selectedDate.getFullYear(), selectedDate.getMonth() + 1),
+    enabled: isSelfService && employeeId != null,
   });
 
   const { data: pendingData } = useQuery({
     queryKey: ["attendance-pending"],
     queryFn: () => attendanceApi.getPendingCheckouts(),
+    enabled: isAdmin,
   });
 
-  const pageData = data?.data?.data;
-  const records = pageData?.content ?? [];
+  const pageData = managementQuery.data?.data?.data;
+  const selfRecords = selfQuery.data?.data?.data ?? [];
+  const attendanceByEmployee = new Map(
+    (pageData?.content ?? []).map((record) => [record.employeeId, record]),
+  );
+  const managementRows: AttendanceRow[] = employees
+    .filter((employee) => !dateFilter || employee.joiningDate <= dateFilter)
+    .map((employee) => ({
+      employeeId: employee.id,
+      employeeCode: employee.employeeCode,
+      employeeName: employee.name,
+      record: attendanceByEmployee.get(employee.id),
+    }))
+    .filter((row) => statusFilter === "NOT_RECORDED"
+      ? !row.record
+      : !statusFilter || row.record?.status === statusFilter);
+  const selfRows: AttendanceRow[] = selfRecords
+    .filter((record) => (!dateFilter || record.attendanceDate === dateFilter)
+      && (!statusFilter || record.status === statusFilter))
+    .map((record) => ({
+      employeeId: record.employeeId,
+      employeeCode: record.employeeCode,
+      employeeName: record.employeeName,
+      record,
+    }));
+  const rows = isSelfService ? selfRows : managementRows;
+  const isLoading = isSelfService
+    ? selfQuery.isLoading
+    : managementQuery.isLoading || employeesLoading;
   const pendingCount = pendingData?.data?.data?.length ?? 0;
 
   // ── Forms ─────────────────────────────────────────────────────────────────
   const ciForm = useForm<CheckInForm>({ resolver: zodResolver(checkInSchema) });
   const corrForm = useForm<CorrectForm>({ resolver: zodResolver(correctSchema) });
+
+  const openCheckIn = (selectedEmployeeId?: number, selectedAttendanceDate = today) => {
+    setShowCheckIn(true);
+    ciForm.reset({
+      employeeId: isSelfService ? employeeId : selectedEmployeeId,
+      attendanceDate: selectedAttendanceDate,
+      checkIn: new Date().toTimeString().slice(0, 5),
+    });
+  };
 
   // ── Mutations ─────────────────────────────────────────────────────────────
   const checkInM = useMutation({
@@ -120,7 +179,7 @@ export default function AttendancePage() {
   });
 
   // ── Table columns ─────────────────────────────────────────────────────────
-  const columns: Column<AttendanceRecord>[] = [
+  const columns: Column<AttendanceRow>[] = [
     {
       key: "emp",
       header: "Employee",
@@ -131,23 +190,29 @@ export default function AttendancePage() {
         </div>
       ),
     },
-    { key: "date", header: "Date", render: (r) => formatDate(r.attendanceDate) },
-    { key: "in", header: "Check In", render: (r) => r.checkIn ?? "—" },
-    { key: "out", header: "Check Out", render: (r) => r.checkOut ?? "—" },
-    { key: "hrs", header: "Worked", render: (r) => (r.workedMinutes > 0 ? minutesToHours(r.workedMinutes) : "—") },
+    { key: "date", header: "Date", render: (r) => formatDate(r.record?.attendanceDate ?? dateFilter) },
+    { key: "in", header: "Check In", render: (r) => r.record?.checkIn ?? "—" },
+    { key: "out", header: "Check Out", render: (r) => r.record?.checkOut ?? "—" },
+    { key: "hrs", header: "Worked", render: (r) => r.record && r.record.workedMinutes > 0 ? minutesToHours(r.record.workedMinutes) : "—" },
     {
       key: "stat",
       header: "Status",
-      render: (r) => <Badge variant={statusBadge(r.status)}>{r.status.replace(/_/g, " ")}</Badge>,
+      render: (r) => r.record
+        ? <Badge variant={statusBadge(r.record.status)}>{r.record.status.replace(/_/g, " ")}</Badge>
+        : <Badge variant="neutral">NOT CHECKED IN</Badge>,
     },
-    { key: "rem", header: "Remarks", render: (r) => <span className="text-xs text-gray-500 truncate max-w-36 block">{r.remarks ?? "—"}</span> },
-    {
+    { key: "rem", header: "Remarks", render: (r) => <span className="text-xs text-gray-500 truncate max-w-36 block">{r.record?.remarks ?? "—"}</span> },
+    ...((isAdmin || isSupervisor || isSelfService) ? [{
       key: "act",
       header: "Actions",
       render: (r) => (
         <div className="flex gap-1">
-          {/* Quick check-out button for PENDING_CHECKOUT or PRESENT with no checkout */}
-          {(r.status === "PENDING_CHECKOUT" || (r.status === "PRESENT" && !r.checkOut)) && (
+          {!r.record && !isSelfService && (
+            <Button size="sm" variant="ghost" onClick={() => openCheckIn(r.employeeId, dateFilter || today)}>
+              Check In
+            </Button>
+          )}
+          {r.record && (r.record.status === "PENDING_CHECKOUT" || (r.record.status === "PRESENT" && !r.record.checkOut)) && (
             <Button
               size="sm"
               variant="ghost"
@@ -155,48 +220,44 @@ export default function AttendancePage() {
               loading={checkOutM.isPending}
               onClick={() => {
                 const now = new Date().toTimeString().slice(0, 5);
-                checkOutM.mutate({ id: r.id, checkOut: now });
+                checkOutM.mutate({ id: r.record!.id, checkOut: now });
               }}
             >
               Check Out
             </Button>
           )}
-          <Button
+          {isAdmin && r.record && <Button
             size="sm"
             variant="ghost"
             onClick={() => {
-              setCorrectRecord(r);
+              setCorrectRecord(r.record!);
               corrForm.reset({
-                checkIn: r.checkIn ?? "",
-                checkOut: r.checkOut ?? "",
-                status: r.status,
+                checkIn: r.record?.checkIn ?? "",
+                checkOut: r.record?.checkOut ?? "",
+                status: r.record?.status,
               });
             }}
           >
             Correct
-          </Button>
+          </Button>}
         </div>
       ),
-    },
+    } as Column<AttendanceRow>] : []),
   ];
 
   return (
     <div>
       <PageHeader
         title="Attendance"
-        subtitle="Daily attendance tracking"
+        subtitle={isSelfService ? "View and record your attendance" : "Daily attendance tracking"}
         icon={<Clock size={20} />}
-        actions={
+        actions={canRecordAttendance ?
           <Button
             icon={<Plus size={15} />}
-            onClick={() => {
-              setShowCheckIn(true);
-              ciForm.reset({ attendanceDate: today });
-            }}
+            onClick={() => openCheckIn(undefined, today)}
           >
             Check In
-          </Button>
-        }
+          </Button> : undefined}
       />
 
       {/* Pending checkout alert */}
@@ -216,7 +277,6 @@ export default function AttendancePage() {
             value={dateFilter}
             onChange={(e) => {
               setDateFilter(e.target.value);
-              goToPage(0);
             }}
             className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
@@ -227,7 +287,6 @@ export default function AttendancePage() {
             value={statusFilter}
             onChange={(e) => {
               setStatusFilter(e.target.value);
-              goToPage(0);
             }}
             placeholder="All Status"
             options={[
@@ -236,6 +295,7 @@ export default function AttendancePage() {
               { value: "PAID_LEAVE", label: "Paid Leave" },
               { value: "HOLIDAY", label: "Holiday" },
               { value: "PENDING_CHECKOUT", label: "Pending Checkout" },
+              ...(!isSelfService ? [{ value: "NOT_RECORDED", label: "Not Checked In" }] : []),
             ]}
           />
         </div>
@@ -245,7 +305,6 @@ export default function AttendancePage() {
           onClick={() => {
             setDateFilter(today);
             setStatusFilter("");
-            goToPage(0);
           }}
         >
           Reset
@@ -254,14 +313,9 @@ export default function AttendancePage() {
 
       <DataTable
         columns={columns}
-        data={records}
+        data={rows}
         loading={isLoading}
-        totalPages={pageData?.totalPages}
-        currentPage={page}
-        totalElements={pageData?.totalElements}
-        pageSize={size}
-        onPageChange={goToPage}
-        rowKey={(r) => r.id}
+        rowKey={(r) => r.record?.id ?? `employee-${r.employeeId}`}
         emptyMessage={dateFilter ? `No attendance records for ${formatDate(dateFilter)}` : "No records found"}
       />
 
@@ -292,16 +346,26 @@ export default function AttendancePage() {
         }
       >
         <div className="space-y-4">
-          {/* Employee dropdown instead of manual ID entry */}
-          <Select label="Employee *" options={employeeOptions} placeholder="Select employee" error={ciForm.formState.errors.employeeId?.message} {...ciForm.register("employeeId")} />
-          <Input label="Date *" type="date" error={ciForm.formState.errors.attendanceDate?.message} {...ciForm.register("attendanceDate")} />
+          {isSelfService ? (
+            <input type="hidden" value={employeeId ?? ""} {...ciForm.register("employeeId")} />
+          ) : (
+            <Select label="Employee *" options={employeeOptions} placeholder="Select employee" error={ciForm.formState.errors.employeeId?.message} {...ciForm.register("employeeId")} />
+          )}
+          {isSelfService ? (
+            <>
+              <input type="hidden" value={today} {...ciForm.register("attendanceDate")} />
+              <Input label="Date" value={formatDate(today)} disabled />
+            </>
+          ) : (
+            <Input label="Date *" type="date" error={ciForm.formState.errors.attendanceDate?.message} {...ciForm.register("attendanceDate")} />
+          )}
           <Input label="Check-In Time *" type="time" error={ciForm.formState.errors.checkIn?.message} {...ciForm.register("checkIn")} />
           <Input label="Remarks" placeholder="Optional notes" {...ciForm.register("remarks")} />
         </div>
       </Modal>
 
       {/* ── Correct Attendance Modal ─────────────────────────────────────── */}
-      <Modal
+      {isAdmin && <Modal
         isOpen={!!correctRecord}
         onClose={() => setCorrectRecord(null)}
         title={`Correct Attendance — ${correctRecord?.employeeName}`}
@@ -333,7 +397,7 @@ export default function AttendancePage() {
           />
           <Input label="Remarks *" error={corrForm.formState.errors.remarks?.message} placeholder="Reason for correction (required)" {...corrForm.register("remarks")} />
         </div>
-      </Modal>
+      </Modal>}
     </div>
   );
 }

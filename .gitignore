@@ -1,6 +1,12 @@
 node_modules
 dist
 dist-ssr
+.idea/
+target/
+.m2-repository/
+*.patch
+*-stat.txt
+*-status.txt
 *.local
 .env
 .env.local

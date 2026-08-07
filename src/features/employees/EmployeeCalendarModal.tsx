@@ -35,7 +35,7 @@ const STATUS_CONFIG: Record<
 > = {
   PRESENT: { bg: "bg-emerald-500", text: "text-white", icon: <CheckCircle2 size={10} />, label: "Present" },
   ABSENT: { bg: "bg-red-400", text: "text-white", icon: <XCircle size={10} />, label: "Absent" },
-  PAID_LEAVE: { bg: "bg-blue-400", text: "text-white", icon: <Umbrella size={10} />, label: "Paid Leave" },
+  PAID_LEAVE: { bg: "bg-amber-500", text: "text-gray-950", icon: <Umbrella size={10} />, label: "Paid Leave" },
   HOLIDAY: { bg: "bg-purple-400", text: "text-white", icon: <Sun size={10} />, label: "Holiday" },
   PENDING_CHECKOUT: { bg: "bg-amber-400", text: "text-white", icon: <Clock size={10} />, label: "Pending Checkout" },
   FUTURE: { bg: "bg-gray-100 dark:bg-gray-800", text: "text-gray-300 dark:text-gray-600", icon: null, label: "" },
@@ -212,7 +212,7 @@ export function EmployeeCalendarModal({ employee, onClose }: Props) {
             {[
               { label: "Present", value: stats.present, color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950/30" },
               { label: "Absent", value: stats.absent, color: "text-red-600 dark:text-red-400", bg: "bg-red-50 dark:bg-red-950/30" },
-              { label: "Paid Leave", value: stats.leave, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-950/30" },
+              { label: "Paid Leave", value: stats.leave, color: "text-amber-700 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-950/30" },
               { label: "Holidays", value: stats.holiday, color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-50 dark:bg-purple-950/30" },
             ].map((s) => (
               <div key={s.label} className={cn("rounded-xl p-2.5 text-center", s.bg)}>
