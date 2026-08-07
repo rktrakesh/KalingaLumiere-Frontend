@@ -18,6 +18,8 @@ import { useToast } from "@/hooks/useToast";
 import { usePagination } from "@/hooks/usePagination";
 import { Loan, LoanLedger } from "@/types";
 import { formatCurrency, formatDate } from "@/utils/format";
+import { useAuthStore } from "@/store/authStore";
+import { hasRole } from "@/utils/authorization";
 
 const schema = z.object({
   employeeId: z.coerce.number().positive("Select an employee"),
@@ -29,6 +31,9 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 export default function LoanPage() {
+  const { user } = useAuthStore();
+  const isAdmin = hasRole(user, "ROLE_ADMIN");
+  const employeeId = user?.employeeId;
   const qc = useQueryClient();
   const toast = useToast();
   const { page, size, goToPage } = usePagination();
@@ -41,7 +46,7 @@ export default function LoanPage() {
   const { data: empData } = useQuery({
     queryKey: ["employees-active"],
     queryFn: () => employeesApi.getAll({ status: "ACTIVE", size: 200 }),
-    enabled: showCreate, // only load when modal is open
+    enabled: isAdmin && showCreate,
   });
   const employeeOptions = (empData?.data?.data?.content ?? []).map((e: any) => ({
     value: String(e.id),
@@ -50,14 +55,20 @@ export default function LoanPage() {
 
   // ── Loans ──────────────────────────────────────────────────────────────
   const { data, isLoading } = useQuery({
-    queryKey: ["loans", page, size, statusFilter],
-    queryFn: () => loanApi.getAll({ page, size, status: statusFilter || undefined }),
+    queryKey: ["loans", isAdmin ? "management" : employeeId, page, size, statusFilter],
+    queryFn: () => loanApi.getAll({
+      employeeId: isAdmin ? undefined : employeeId,
+      page,
+      size,
+      status: statusFilter || undefined,
+    }),
+    enabled: isAdmin || employeeId != null,
   });
 
   const { data: ledgerData } = useQuery({
     queryKey: ["loan-ledger", ledgerLoan?.id],
     queryFn: () => loanApi.getLedger(ledgerLoan!.id),
-    enabled: !!ledgerLoan,
+    enabled: isAdmin && !!ledgerLoan,
   });
 
   const pageData = data?.data?.data;
@@ -66,7 +77,7 @@ export default function LoanPage() {
 
   // ── Mutations ──────────────────────────────────────────────────────────
   const createM = useMutation({
-    mutationFn: (d: FormData) => loanApi.create(d),
+    mutationFn: (d: FormData) => loanApi.create({ ...d, employeeId: isAdmin ? d.employeeId : employeeId! }),
     onSuccess: () => {
       toast.success("Loan request created");
       qc.invalidateQueries({ queryKey: ["loans"] });
@@ -115,7 +126,7 @@ export default function LoanPage() {
     { key: "emi", header: "Monthly EMI", render: (l) => formatCurrency(l.monthlyPrincipalPayment) },
     { key: "bal", header: "Balance", render: (l) => (l.currentBalance != null ? formatCurrency(l.currentBalance) : "—") },
     { key: "stat", header: "Status", render: (l) => <Badge variant={statusBadge(l.status)}>{l.status.replace(/_/g, " ")}</Badge> },
-    {
+    ...(isAdmin ? [{
       key: "act",
       header: "Actions",
       render: (l) => (
@@ -137,7 +148,7 @@ export default function LoanPage() {
           )}
         </div>
       ),
-    },
+    } as Column<Loan>] : []),
   ];
 
   const ledgerCols: Column<LoanLedger>[] = [
@@ -152,18 +163,18 @@ export default function LoanPage() {
   return (
     <div>
       <PageHeader
-        title="Employee Loans"
-        subtitle="Loan approvals and repayment tracking"
+        title={isAdmin ? "Employee Loans" : "My Loans"}
+        subtitle={isAdmin ? "Loan approvals and repayment tracking" : "View your requests and apply for a loan"}
         icon={<CreditCard size={20} />}
         actions={
           <Button
             icon={<Plus size={15} />}
             onClick={() => {
               setShowCreate(true);
-              form.reset();
+              form.reset(isAdmin ? undefined : { employeeId });
             }}
           >
-            New Loan
+            {isAdmin ? "New Loan" : "Apply for Loan"}
           </Button>
         }
       />
@@ -193,7 +204,7 @@ export default function LoanPage() {
           setShowCreate(false);
           form.reset();
         }}
-        title="Create Loan Request"
+        title={isAdmin ? "Create Loan Request" : "Apply for Loan"}
         size="md"
         footer={
           <>
@@ -213,8 +224,11 @@ export default function LoanPage() {
         }
       >
         <div className="space-y-4">
-          {/* Employee dropdown */}
-          <Select label="Employee *" options={employeeOptions} placeholder={empData ? "Select employee" : "Loading employees…"} error={form.formState.errors.employeeId?.message} {...form.register("employeeId")} />
+          {isAdmin ? (
+            <Select label="Employee *" options={employeeOptions} placeholder={empData ? "Select employee" : "Loading employees…"} error={form.formState.errors.employeeId?.message} {...form.register("employeeId")} />
+          ) : (
+            <input type="hidden" value={employeeId ?? ""} {...form.register("employeeId")} />
+          )}
 
           <Input label="Principal Amount (₹) *" type="number" placeholder="e.g. 50000" error={form.formState.errors.principalAmount?.message} {...form.register("principalAmount")} />
 
@@ -225,14 +239,14 @@ export default function LoanPage() {
 
           <Textarea label="Remarks" placeholder="Reason for loan (optional)" {...form.register("remarks")} />
 
-          <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-300">
+          <div className="p-3 rounded-lg bg-brand-50 dark:bg-brand-950/30 border border-brand-200 dark:border-brand-800 text-xs text-brand-700 dark:text-brand-300">
             <strong>Note:</strong> Only one active loan is allowed per employee. This loan will be created in <strong>PENDING_APPROVAL</strong> status. Once approved, the principal will be disbursed and interest will be calculated using simple interest.
           </div>
         </div>
       </Modal>
 
       {/* ── Loan Ledger Modal ───────────────────────────────────────────── */}
-      <Modal
+      {isAdmin && <Modal
         isOpen={!!ledgerLoan}
         onClose={() => setLedgerLoan(null)}
         title={`Loan Ledger — ${ledgerLoan?.loanReference} (${ledgerLoan?.employeeName})`}
@@ -258,7 +272,7 @@ export default function LoanPage() {
           </div>
         </div>
         <DataTable columns={ledgerCols} data={ledger} rowKey={(l) => l.id} emptyMessage="No ledger entries found" />
-      </Modal>
+      </Modal>}
     </div>
   );
 }

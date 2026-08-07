@@ -8,7 +8,7 @@ export function ProductShowcase() {
   const [selected, setSelected] = useState<LandingProduct | null>(null);
 
   return (
-    <section id="products" className="relative bg-[#070707] px-6 py-28 sm:py-36">
+    <section id="products" className="relative scroll-mt-20 bg-[#070707] px-6 py-28 sm:py-36">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
       <div className="mx-auto max-w-6xl">

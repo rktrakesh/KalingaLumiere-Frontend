@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sun, Moon, Bell, LogOut, User, ChevronDown, Menu } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -10,11 +10,12 @@ import { authApi } from '@/services/api/auth.api';
 import { Notification } from '@/types';
 import { formatDateTime } from '@/utils/format';
 import { cn } from '@/utils/cn';
+import { authoritativeRoles, roleLabel } from '@/utils/authorization';
 
 interface TopbarProps { onMenuToggle: () => void; }
 
 const TYPE_COLORS: Record<string, string> = {
-  PENDING_OT_APPROVAL: 'bg-amber-400', PENDING_LOAN_APPROVAL: 'bg-blue-400',
+  PENDING_OT_APPROVAL: 'bg-amber-400', PENDING_LOAN_APPROVAL: 'bg-brand-400',
   PENDING_LEAVE_APPROVAL: 'bg-green-400', FORGOTTEN_CHECKOUT: 'bg-red-400',
   LOW_INVENTORY: 'bg-orange-400', PAYROLL_PENDING: 'bg-purple-400', MONTH_CLOSING_PENDING: 'bg-pink-400',
 };
@@ -23,6 +24,7 @@ export const Topbar = ({ onMenuToggle }: TopbarProps) => {
   const { isDark, toggle } = useThemeStore();
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const [showUser, setShowUser] = useState(false);
   const [showNotif, setShowNotif] = useState(false);
   const userRef  = useRef<HTMLDivElement>(null);
@@ -43,14 +45,19 @@ export const Topbar = ({ onMenuToggle }: TopbarProps) => {
   }, []);
 
   const handleLogout = async () => { try { await authApi.logout(); } catch {} logout(); navigate('/login'); };
+  const sectionName = location.pathname.split('/').filter(Boolean).pop()?.replace(/-/g, ' ') ?? 'dashboard';
 
   return (
-    <header className="h-14 flex items-center gap-4 px-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
-      <button onClick={onMenuToggle} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"><Menu size={18} /></button>
+    <header className="erp-topbar h-16 flex items-center gap-2 sm:gap-4 px-3 sm:px-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
+      <button onClick={onMenuToggle} className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 md:hidden" aria-label="Toggle navigation"><Menu size={18} /></button>
+      <div className="min-w-0">
+        <p className="text-[9px] uppercase tracking-[0.18em] text-gray-400">Command center</p>
+        <p className="truncate text-xs font-semibold capitalize text-gray-800 dark:text-gray-200">{sectionName}</p>
+      </div>
       <div className="flex-1" />
       <motion.button whileTap={{ scale: 0.9 }} onClick={toggle} className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors">
         <AnimatePresence mode="wait">
-          <motion.div key={isDark ? 'moon' : 'sun'} initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.2 }}>
+          <motion.div key={isDark ? 'moon' : 'sun'} initial={{ rotate: -45, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 45, opacity: 0 }} transition={{ duration: 0.12, ease: 'easeOut' }}>
             {isDark ? <Sun size={18} /> : <Moon size={18} />}
           </motion.div>
         </AnimatePresence>
@@ -63,8 +70,8 @@ export const Topbar = ({ onMenuToggle }: TopbarProps) => {
         </button>
         <AnimatePresence>
           {showNotif && (
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}
-              className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
+            <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }} transition={{ duration: 0.12, ease: 'easeOut' }}
+              className="erp-popover absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] max-w-80 bg-white dark:bg-gray-900 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                 <p className="text-sm font-semibold text-gray-900 dark:text-white">Notifications</p>
                 {unread > 0 && <span className="text-xs text-brand-600 dark:text-brand-400 font-medium">{unread} unread</span>}
@@ -96,14 +103,14 @@ export const Topbar = ({ onMenuToggle }: TopbarProps) => {
           <div className="w-7 h-7 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{user?.fullName?.[0]?.toUpperCase() ?? 'U'}</div>
           <div className="text-left hidden sm:block">
             <p className="text-xs font-semibold text-gray-900 dark:text-white leading-tight truncate max-w-28">{user?.fullName}</p>
-            <p className="text-[10px] text-gray-400 leading-tight">{user?.role?.replace('ROLE_','')}</p>
+            <p className="text-[10px] text-gray-400 leading-tight">{user ? authoritativeRoles(user).slice(0, 2).map(roleLabel).join(' · ') : ''}</p>
           </div>
-          <ChevronDown size={14} className="text-gray-400" />
+          <ChevronDown size={14} className="hidden text-gray-400 sm:block" />
         </button>
         <AnimatePresence>
           {showUser && (
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}
-              className="absolute right-0 top-full mt-2 w-52 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden py-1.5">
+            <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }} transition={{ duration: 0.12, ease: 'easeOut' }}
+              className="erp-popover absolute right-0 top-full mt-2 w-52 bg-white dark:bg-gray-900 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden py-1.5">
               <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
                 <p className="text-sm font-semibold text-gray-900 dark:text-white">{user?.fullName}</p>
                 <p className="text-xs text-gray-400">{user?.username}</p>
