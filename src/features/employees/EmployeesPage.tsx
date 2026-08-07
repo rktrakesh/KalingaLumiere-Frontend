@@ -7,6 +7,7 @@ import { z } from "zod";
 import { Users, Plus, Eye, UserX, CalendarDays, IndianRupee } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { employeesApi } from "@/services/api/employees.api";
+import { employeeMastersApi } from "@/services/api/employeeMasters.api";
 import { Employee } from "@/types";
 import { DataTable, Column } from "@/components/common/DataTable";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -14,14 +15,17 @@ import { SearchFilter } from "@/components/common/SearchFilter";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
 import { Badge, statusBadge } from "@/components/ui/Badge";
 import { useToast } from "@/hooks/useToast";
 import { useDebounce } from "@/hooks/useDebounce";
 import { usePagination } from "@/hooks/usePagination";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { EmployeeCalendarModal } from "./EmployeeCalendarModal";
+import { getApiErrorMessage } from "@/utils/apiError";
 
 const createSchema = z.object({
+  createLogin: z.preprocess((value) => value === true || value === "true", z.boolean()),
   name: z.string().min(2, "Name required"),
   phone: z
     .string()
@@ -29,8 +33,11 @@ const createSchema = z.object({
     .optional()
     .or(z.literal("")),
   address: z.string().optional(),
+  email: z.string().email("Enter a valid email").optional().or(z.literal("")),
   joiningDate: z.string().min(1, "Joining date required"),
-  designation: z.string().optional(),
+  employeeCategoryId: z.coerce.number().positive("Employee category required"),
+  designationId: z.coerce.number().positive("Designation required"),
+  departmentId: z.preprocess((value) => value === "" ? undefined : value, z.coerce.number().positive().optional()),
   currentSalary: z.coerce.number().positive("Salary must be positive"),
   salaryRemarks: z.string().optional(),
 });
@@ -65,8 +72,12 @@ export default function EmployeesPage() {
   const pageData = data?.data?.data;
   const employees = pageData?.content ?? [];
 
-  const cForm = useForm<CreateForm>({ resolver: zodResolver(createSchema) });
+  const cForm = useForm<CreateForm>({ resolver: zodResolver(createSchema), defaultValues: { createLogin: false } });
+  const selectedCategoryId = cForm.watch("employeeCategoryId");
   const sForm = useForm<SalaryForm>({ resolver: zodResolver(salarySchema) });
+  const categoriesQuery = useQuery({ queryKey: ["employee-categories", "active"], queryFn: () => employeeMastersApi.getEmployeeCategories(), enabled: showCreate });
+  const departmentsQuery = useQuery({ queryKey: ["departments", "active"], queryFn: () => employeeMastersApi.getDepartments(), enabled: showCreate });
+  const designationsQuery = useQuery({ queryKey: ["designations", selectedCategoryId || "all"], queryFn: () => employeeMastersApi.getDesignations(selectedCategoryId || undefined), enabled: showCreate });
 
   const createM = useMutation({
     mutationFn: (d: CreateForm) => employeesApi.create(d),
@@ -76,7 +87,7 @@ export default function EmployeesPage() {
       setShowCreate(false);
       cForm.reset();
     },
-    onError: (e: any) => toast.error(e?.response?.data?.message ?? "Failed to create employee"),
+    onError: (error: unknown) => toast.error(getApiErrorMessage(error, "Failed to create employee")),
   });
 
   const deactivateM = useMutation({
@@ -85,7 +96,7 @@ export default function EmployeesPage() {
       toast.success("Employee deactivated");
       qc.invalidateQueries({ queryKey: ["employees"] });
     },
-    onError: (e: any) => toast.error(e?.response?.data?.message ?? "Failed to deactivate"),
+    onError: (error: unknown) => toast.error(getApiErrorMessage(error, "Failed to deactivate")),
   });
 
   const salaryM = useMutation({
@@ -96,7 +107,7 @@ export default function EmployeesPage() {
       setShowSalary(null);
       sForm.reset();
     },
-    onError: (e: any) => toast.error(e?.response?.data?.message ?? "Failed to update salary"),
+    onError: (error: unknown) => toast.error(getApiErrorMessage(error, "Failed to update salary")),
   });
 
   const columns: Column<Employee>[] = [
@@ -229,11 +240,39 @@ export default function EmployeesPage() {
         <div className="grid grid-cols-2 gap-4">
           <Input label="Full Name *" error={cForm.formState.errors.name?.message} placeholder="e.g. Ravi Kumar" {...cForm.register("name")} className="col-span-2" />
           <Input label="Phone" error={cForm.formState.errors.phone?.message} placeholder="10-digit mobile number" {...cForm.register("phone")} />
-          <Input label="Designation" placeholder="e.g. Floor Supervisor" {...cForm.register("designation")} />
+          <Input label="Email" type="email" error={cForm.formState.errors.email?.message} placeholder="employee@example.com" {...cForm.register("email")} />
+          <Select label="Employee Category *" error={cForm.formState.errors.employeeCategoryId?.message} placeholder="Select category" options={(categoriesQuery.data?.data.data ?? []).map((item) => ({ value: String(item.id), label: item.name }))} {...cForm.register("employeeCategoryId", { onChange: () => cForm.setValue("designationId", 0) })} />
+          <div className="space-y-1.5">
+            <Select
+              label="Designation *"
+              error={cForm.formState.errors.designationId?.message}
+              placeholder={designationsQuery.isLoading ? "Loading designations…" : "Select designation"}
+              disabled={designationsQuery.isLoading || designationsQuery.isError}
+              options={(designationsQuery.data?.data.data ?? []).map((item) => ({ value: String(item.id), label: selectedCategoryId ? item.name : `${item.name} — ${item.categoryName}` }))}
+              {...cForm.register("designationId", {
+                onChange: (event) => {
+                  const designation = (designationsQuery.data?.data.data ?? []).find((item) => item.id === Number(event.target.value));
+                  if (designation) cForm.setValue("employeeCategoryId", designation.categoryId, { shouldValidate: true });
+                },
+              })}
+            />
+            {designationsQuery.isError && <p className="text-xs text-red-600 dark:text-red-400">Designations could not be loaded. Close this form and try again.</p>}
+            {!designationsQuery.isLoading && !designationsQuery.isError && (designationsQuery.data?.data.data.length ?? 0) === 0 && <p className="text-xs text-amber-600 dark:text-amber-400">No active designations are configured for this category.</p>}
+          </div>
+          <Select label="Department" placeholder="No department" options={(departmentsQuery.data?.data.data ?? []).map((item) => ({ value: String(item.id), label: item.name }))} {...cForm.register("departmentId")} />
           <Input label="Joining Date *" type="date" error={cForm.formState.errors.joiningDate?.message} {...cForm.register("joiningDate")} />
           <Input label="Monthly Salary (₹) *" type="number" error={cForm.formState.errors.currentSalary?.message} placeholder="e.g. 15000" {...cForm.register("currentSalary")} />
           <Input label="Address" placeholder="Full address" {...cForm.register("address")} className="col-span-2" />
           <Input label="Salary Remarks" placeholder="Reason for initial salary (optional)" {...cForm.register("salaryRemarks")} className="col-span-2" />
+          <Select
+            label="Create Login"
+            options={[{ value: "false", label: "No" }, { value: "true", label: "Yes" }]}
+            {...cForm.register("createLogin")}
+            className="col-span-2"
+          />
+          <p className="col-span-2 -mt-2 text-xs text-gray-500 dark:text-gray-400">
+            Choose Yes to use the standard employee onboarding flow. Login credentials are generated by the backend; no separate account is created here.
+          </p>
         </div>
       </Modal>
 

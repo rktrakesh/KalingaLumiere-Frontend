@@ -30,6 +30,7 @@ export interface TokenResponse {
   username: string;
   fullName: string;
   role: UserRole;
+  roles: UserRole[];
   /** True right after onboarding or an admin-triggered reset — frontend must route
    *  straight to Change Password and nowhere else until it's changed. */
   mustChangePassword?: boolean;
@@ -39,15 +40,35 @@ export interface UserProfile {
   username: string;
   fullName: string;
   role: UserRole;
+  roles: UserRole[];
   employeeId?: number;
-  status: string;
+  status: UserStatus;
   mustChangePassword?: boolean;
+  credentialsExpired?: boolean;
+  failedLoginAttempts: number;
+  lockedAt?: string | null;
+  lastLoginAt?: string | null;
+  temporaryPasswordIssuedAt?: string | null;
+  temporaryPasswordExpiresAt?: string | null;
+  enabled: boolean;
+  accountNonLocked: boolean;
   /** Null for users with no linked Employee (e.g. a system ADMIN account). Drives
    *  Role-Based Dashboard Routing (see utils/routing.ts). */
   employeeCategory?: EmployeeCategory | null;
 }
-export type UserRole = "ROLE_ADMIN" | "ROLE_MANAGER" | "ROLE_SUPERVISOR" | "ROLE_EMPLOYEE";
+export type AuthenticatedUser = UserProfile;
+export type UserProfileResponse = UserProfile;
+export type IAMUser = UserProfile;
+export type UserRole = "ROLE_ADMIN" | "ROLE_MANAGER" | "ROLE_SUPERVISOR" | "ROLE_HR" | "ROLE_FINANCE" | "ROLE_SALES" | "ROLE_EMPLOYEE";
+export type UserStatus = "ACTIVE" | "INACTIVE" | "LOCKED";
 export type EmployeeCategory = "FACTORY" | "SALES" | "ADMINISTRATION";
+
+export interface TemporaryPasswordResetResponse {
+  temporaryPassword: string;
+  temporaryPasswordExpiresAt: string;
+  mustChangePassword: boolean;
+  emailDeliveryAttempted: boolean;
+}
 
 export interface ForgotPasswordRequest {
   email: string;
@@ -71,13 +92,29 @@ export interface Employee {
   createdDate?: string;
 }
 export interface CreateEmployeeRequest {
+  createLogin: boolean;
   name: string;
   phone?: string;
   address?: string;
+  email?: string;
   joiningDate: string;
-  designation?: string;
+  designationId: number;
+  departmentId?: number;
+  employeeCategoryId: number;
   currentSalary: number;
   salaryRemarks?: string;
+}
+export interface EmployeeMasterData {
+  id: number;
+  code: string;
+  name: string;
+  description?: string;
+  active: boolean;
+}
+export interface DesignationMasterData extends EmployeeMasterData {
+  categoryId: number;
+  categoryCode: string;
+  categoryName: string;
 }
 export interface SalaryHistory {
   id: number;

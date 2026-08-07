@@ -6,7 +6,8 @@ export const ProtectedRoute = () => {
   const location = useLocation();
   if (!isAuthenticated) return <Navigate to="/login" state={{ from: location }} replace />;
 
-  if (mustChangePassword() && location.pathname !== "/change-password") {
+  const forcedPasswordAllowed = ["/change-password", "/profile"].includes(location.pathname);
+  if (mustChangePassword() && !forcedPasswordAllowed) {
     return <Navigate to="/change-password" replace />;
   }
   return <Outlet />;

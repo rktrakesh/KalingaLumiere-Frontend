@@ -10,6 +10,7 @@ import { authApi } from '@/services/api/auth.api';
 import { Notification } from '@/types';
 import { formatDateTime } from '@/utils/format';
 import { cn } from '@/utils/cn';
+import { authoritativeRoles, roleLabel } from '@/utils/authorization';
 
 interface TopbarProps { onMenuToggle: () => void; }
 
@@ -102,7 +103,7 @@ export const Topbar = ({ onMenuToggle }: TopbarProps) => {
           <div className="w-7 h-7 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{user?.fullName?.[0]?.toUpperCase() ?? 'U'}</div>
           <div className="text-left hidden sm:block">
             <p className="text-xs font-semibold text-gray-900 dark:text-white leading-tight truncate max-w-28">{user?.fullName}</p>
-            <p className="text-[10px] text-gray-400 leading-tight">{user?.role?.replace('ROLE_','')}</p>
+            <p className="text-[10px] text-gray-400 leading-tight">{user ? authoritativeRoles(user).slice(0, 2).map(roleLabel).join(' · ') : ''}</p>
           </div>
           <ChevronDown size={14} className="hidden text-gray-400 sm:block" />
         </button>

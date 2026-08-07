@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { LayoutDashboard, Users, Clock, CalendarCheck, Calendar, Timer, CreditCard, Receipt, Wallet, Building2, UserCheck, ShoppingCart, ShoppingBag, Package, Factory, Settings, Lock, FileText, Search, ChevronDown, ChevronRight, Flame, X, Menu, Trophy, IndianRupee } from "lucide-react";
+import { LayoutDashboard, Users, Clock, CalendarCheck, Calendar, Timer, CreditCard, Receipt, Wallet, Building2, UserCheck, ShoppingCart, ShoppingBag, Package, Factory, Settings, Lock, FileText, Search, ChevronDown, ChevronRight, Flame, X, Menu, Trophy, IndianRupee, ShieldCheck } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { useAuthStore } from "@/store/authStore";
 import { publicAssetUrl, useCompanyBranding } from "@/services/api/branding.api";
+import { canAccessRoute, hasRole } from "@/utils/authorization";
 
 interface NavItem {
   label: string;
@@ -64,7 +65,15 @@ const navItems: NavItem[] = [
   { label: "Audit", path: "/audit", icon: <Search size={18} /> },
   { label: "Month Closing", path: "/month-closing", icon: <Lock size={18} /> },
   { label: "Settings", path: "/settings", icon: <Settings size={18} /> },
+  { label: "User Management", path: "/user-management", icon: <ShieldCheck size={18} /> },
 ];
+
+const visibleNavigation = (items: NavItem[], user: Parameters<typeof canAccessRoute>[0]): NavItem[] =>
+  items.flatMap((item) => {
+    if (item.path) return canAccessRoute(user, item.path) ? [item] : [];
+    const children = visibleNavigation(item.children ?? [], user);
+    return children.length ? [{ ...item, children }] : [];
+  });
 
 function NavItemComp({ item, collapsed, showLabels, onNavigate, onExpand }: { item: NavItem; collapsed: boolean; showLabels: boolean; onNavigate?: () => void; onExpand?: () => void }) {
   const location = useLocation();
@@ -163,7 +172,10 @@ export const Sidebar = ({ collapsed, onToggle, isMobile, mobileOpen, onNavigate 
   const showExpandedContent = isMobile || !collapsed || keepExpandedContent;
   // Performance Dashboard is only relevant (and only reachable — the backend has no
   // linked-employee data to show anyone else) for SALES-category employees.
-  const items: NavItem[] = user?.employeeCategory === "SALES" ? [navItems[0], { label: "Performance", path: "/performance-dashboard", icon: <Trophy size={18} /> }, ...navItems.slice(1)] : navItems;
+  const withPerformance = hasRole(user, "ROLE_SALES") || user?.employeeCategory === "SALES"
+    ? [navItems[0], { label: "Performance", path: "/performance-dashboard", icon: <Trophy size={18} /> }, ...navItems.slice(1)]
+    : navItems;
+  const items = visibleNavigation(withPerformance, user);
 
   return (
     <motion.aside

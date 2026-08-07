@@ -1,11 +1,6 @@
 import type { UserProfile } from "@/types";
+import { resolveHomeRoute } from "@/utils/authorization";
 
-export function resolveDashboardRoute(profile: Pick<UserProfile, "role" | "employeeCategory">): string {
-  if (profile.role === "ROLE_ADMIN" || profile.role === "ROLE_MANAGER") {
-    return "/dashboard";
-  }
-  if (profile.employeeCategory === "SALES") {
-    return "/performance-dashboard";
-  }
-  return "/dashboard";
+export function resolveDashboardRoute(profile: Pick<UserProfile, "role" | "roles" | "employeeCategory">): string {
+  return resolveHomeRoute(profile);
 }

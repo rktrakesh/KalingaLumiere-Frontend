@@ -18,6 +18,8 @@ import { useToast } from "@/hooks/useToast";
 import { usePagination } from "@/hooks/usePagination";
 import { LeaveRequest } from "@/types";
 import { formatDate } from "@/utils/format";
+import { useAuthStore } from "@/store/authStore";
+import { hasRole } from "@/utils/authorization";
 
 const schema = z.object({
   employeeId: z.coerce.number().positive("Select an employee"),
@@ -27,6 +29,9 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 export default function LeavePage() {
+  const { user } = useAuthStore();
+  const isAdmin = hasRole(user, "ROLE_ADMIN");
+  const employeeId = user?.employeeId;
   const qc = useQueryClient();
   const toast = useToast();
   const { page, size, goToPage } = usePagination();
@@ -39,6 +44,7 @@ export default function LeavePage() {
   const { data: empData } = useQuery({
     queryKey: ["employees-active"],
     queryFn: () => employeesApi.getAll({ status: "ACTIVE", size: 200 }),
+    enabled: isAdmin,
   });
   const employeeOptions = (empData?.data?.data?.content ?? []).map((e: any) => ({
     value: String(e.id),
@@ -46,18 +52,28 @@ export default function LeavePage() {
   }));
 
   // ── Leave requests ─────────────────────────────────────────────────────
-  const { data, isLoading } = useQuery({
-    queryKey: ["leaves", page, size, statusFilter],
+  const managementQuery = useQuery({
+    queryKey: ["leaves", "management", page, size, statusFilter],
     queryFn: () => leaveApi.getAll({ page, size, status: statusFilter || undefined }),
+    enabled: isAdmin,
   });
-  const pageData = data?.data?.data;
-  const leaves: LeaveRequest[] = pageData?.content ?? [];
+  const selfQuery = useQuery({
+    queryKey: ["leaves", "self", employeeId],
+    queryFn: () => leaveApi.getMy(employeeId!),
+    enabled: !isAdmin && employeeId != null,
+  });
+  const pageData = managementQuery.data?.data?.data;
+  const employeeLeaves = selfQuery.data?.data?.data ?? [];
+  const leaves: LeaveRequest[] = isAdmin
+    ? pageData?.content ?? []
+    : employeeLeaves.filter((leave) => !statusFilter || leave.status === statusFilter);
+  const isLoading = isAdmin ? managementQuery.isLoading : selfQuery.isLoading;
 
   const form = useForm<FormData>({ resolver: zodResolver(schema) });
 
   // ── Mutations ──────────────────────────────────────────────────────────
   const createM = useMutation({
-    mutationFn: (d: FormData) => leaveApi.request(d),
+    mutationFn: (d: FormData) => leaveApi.request({ ...d, employeeId: isAdmin ? d.employeeId : employeeId! }),
     onSuccess: () => {
       toast.success("Leave request submitted");
       qc.invalidateQueries({ queryKey: ["leaves"] });
@@ -114,7 +130,7 @@ export default function LeavePage() {
           <span className="text-gray-400">—</span>
         ),
     },
-    {
+    ...(isAdmin ? [{
       key: "act",
       header: "Actions",
       render: (r) =>
@@ -137,24 +153,24 @@ export default function LeavePage() {
             </Button>
           </div>
         ) : null,
-    },
+    } as Column<LeaveRequest>] : []),
   ];
 
   return (
     <div>
       <PageHeader
-        title="Leave Management"
-        subtitle="Review and manage employee leave requests"
+        title={isAdmin ? "Leave Management" : "My Leave"}
+        subtitle={isAdmin ? "Review and manage employee leave requests" : "View your leave requests and apply for leave"}
         icon={<CalendarCheck size={20} />}
         actions={
           <Button
             icon={<Plus size={15} />}
             onClick={() => {
               setShowCreate(true);
-              form.reset();
+              form.reset(isAdmin ? undefined : { employeeId });
             }}
           >
-            New Request
+            {isAdmin ? "New Request" : "Apply for Leave"}
           </Button>
         }
       />
@@ -175,7 +191,7 @@ export default function LeavePage() {
         ))}
       </div>
 
-      <DataTable columns={columns} data={leaves} loading={isLoading} totalPages={pageData?.totalPages} currentPage={page} totalElements={pageData?.totalElements} pageSize={size} onPageChange={goToPage} rowKey={(r) => r.id} emptyMessage="No leave requests found" />
+      <DataTable columns={columns} data={leaves} loading={isLoading} totalPages={pageData?.totalPages} currentPage={isAdmin ? page : undefined} totalElements={pageData?.totalElements} pageSize={isAdmin ? size : undefined} onPageChange={isAdmin ? goToPage : undefined} rowKey={(r) => r.id} emptyMessage="No leave requests found" />
 
       {/* ── New Leave Request Modal ─────────────────────────────────────── */}
       <Modal
@@ -184,7 +200,7 @@ export default function LeavePage() {
           setShowCreate(false);
           form.reset();
         }}
-        title="New Leave Request"
+        title={isAdmin ? "New Leave Request" : "Apply for Leave"}
         size="sm"
         footer={
           <>
@@ -204,15 +220,18 @@ export default function LeavePage() {
         }
       >
         <div className="space-y-4">
-          {/* Employee dropdown */}
-          <Select label="Employee *" options={employeeOptions} placeholder="Select employee" error={form.formState.errors.employeeId?.message} {...form.register("employeeId")} />
+          {isAdmin ? (
+            <Select label="Employee *" options={employeeOptions} placeholder="Select employee" error={form.formState.errors.employeeId?.message} {...form.register("employeeId")} />
+          ) : (
+            <input type="hidden" value={employeeId ?? ""} {...form.register("employeeId")} />
+          )}
           <Input label="Leave Date *" type="date" error={form.formState.errors.leaveDate?.message} {...form.register("leaveDate")} />
           <Textarea label="Reason" placeholder="Reason for leave (optional)" {...form.register("reason")} />
         </div>
       </Modal>
 
       {/* ── Reject Leave Modal ──────────────────────────────────────────── */}
-      <Modal
+      {isAdmin && <Modal
         isOpen={!!rejectId}
         onClose={() => {
           setRejectId(null);
@@ -238,7 +257,7 @@ export default function LeavePage() {
         }
       >
         <Textarea label="Rejection Reason *" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="Provide a reason for rejection…" />
-      </Modal>
+      </Modal>}
     </div>
   );
 }

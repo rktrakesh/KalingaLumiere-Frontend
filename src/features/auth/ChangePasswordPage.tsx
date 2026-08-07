@@ -10,6 +10,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useToast } from "@/hooks/useToast";
 import { EmberField } from "@/features/landing/components/EmberField";
 import { resolveDashboardRoute } from "@/utils/routing";
+import { getApiErrorMessage, isTemporaryPasswordExpiredError } from "@/utils/apiError";
 
 const schema = z
   .object({
@@ -26,9 +27,10 @@ type FormData = z.infer<typeof schema>;
 export default function ChangePasswordPage() {
   const navigate = useNavigate();
   const toast = useToast();
-  const { user, setUser, logout, mustChangePassword } = useAuthStore();
+  const { setTokens, setUser, logout, mustChangePassword } = useAuthStore();
   const forced = mustChangePassword();
   const [showPass, setShowPass] = useState(false);
+  const [temporaryPasswordExpired, setTemporaryPasswordExpired] = useState(false);
   const {
     register,
     handleSubmit,
@@ -37,16 +39,23 @@ export default function ChangePasswordPage() {
 
   const onSubmit = async (data: FormData) => {
     try {
-      await authApi.changePassword({ currentPassword: data.currentPassword, newPassword: data.newPassword });
+      const passwordResponse = await authApi.changePassword({
+        currentPassword: data.currentPassword,
+        newPassword: data.newPassword,
+      });
+      const tokens = passwordResponse.data.data;
+      setTokens(tokens.accessToken, tokens.refreshToken);
+      const profileResponse = await authApi.getProfile();
+      const refreshedProfile = profileResponse.data.data;
+      setUser(refreshedProfile);
       toast.success("Password changed successfully");
-      if (user) {
-        setUser({ ...user, mustChangePassword: false });
-        navigate(resolveDashboardRoute(user));
-      } else {
-        navigate("/login");
+      navigate(resolveDashboardRoute(refreshedProfile), { replace: true });
+    } catch (err: unknown) {
+      if (isTemporaryPasswordExpiredError(err)) {
+        setTemporaryPasswordExpired(true);
+        return;
       }
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "Could not change password. Please try again.");
+      toast.error(getApiErrorMessage(err, "Could not change password. Please try again."));
     }
   };
 
@@ -64,6 +73,12 @@ export default function ChangePasswordPage() {
           <p className="mt-2 text-sm text-[#CFCFCF]">{forced ? "For your security, you must set a new password before continuing to your dashboard." : "Enter your current password and choose a new one."}</p>
 
           <form onSubmit={handleSubmit(onSubmit)} className="mt-7 space-y-5">
+            {temporaryPasswordExpired && (
+              <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-100" role="alert">
+                <p>Your temporary password has expired. Use Forgot Password to create a new password.</p>
+                <button type="button" onClick={() => navigate("/forgot-password")} className="mt-2 font-semibold text-[#FFD76A] hover:underline">Go to Forgot Password</button>
+              </div>
+            )}
             <div className="space-y-1.5">
               <label htmlFor="currentPassword" className="block text-xs font-medium uppercase tracking-[0.2em] text-[#D4AF37]">
                 {forced ? "Temporary Password" : "Current Password"}

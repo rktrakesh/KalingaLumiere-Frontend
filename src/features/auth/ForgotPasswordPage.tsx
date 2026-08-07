@@ -26,8 +26,8 @@ export default function ForgotPasswordPage() {
     try {
       await authApi.forgotPassword(data);
       setSubmitted(true);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "Something went wrong. Please try again.");
+    } catch {
+      toast.error("The reset request could not be submitted. Please try again.");
     }
   };
 

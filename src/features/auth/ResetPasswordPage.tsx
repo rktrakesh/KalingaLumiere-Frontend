@@ -8,6 +8,7 @@ import { Eye, EyeOff, Lock, ShieldAlert } from "lucide-react";
 import { authApi } from "@/services/api/auth.api";
 import { useToast } from "@/hooks/useToast";
 import { EmberField } from "@/features/landing/components/EmberField";
+import { getApiErrorMessage } from "@/utils/apiError";
 
 const schema = z
   .object({
@@ -41,8 +42,8 @@ export default function ResetPasswordPage() {
       await authApi.resetPassword({ token, newPassword: data.newPassword });
       toast.success("Password reset — please sign in with your new password.");
       navigate("/login");
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "This reset link is invalid or has expired.");
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, "This reset link is invalid or has expired."));
     }
   };
 

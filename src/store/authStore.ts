@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { UserProfile, UserRole } from "@/types";
+import { hasAnyRole, hasRole } from "@/utils/authorization";
 
 interface AuthState {
   accessToken: string | null;
@@ -11,6 +12,7 @@ interface AuthState {
   setUser: (u: UserProfile) => void;
   logout: () => void;
   hasRole: (r: UserRole) => boolean;
+  hasAnyRole: (roles: readonly UserRole[]) => boolean;
   isAdmin: () => boolean;
   isManager: () => boolean;
   /** True immediately after onboarding or an admin-triggered reset — the app must route
@@ -38,11 +40,12 @@ export const useAuthStore = create<AuthState>()(
         localStorage.removeItem("refreshToken");
         set({ accessToken: null, refreshToken: null, user: null, isAuthenticated: false });
       },
-      hasRole: (role) => get().user?.role === role,
-      isAdmin: () => get().user?.role === "ROLE_ADMIN",
-      isManager: () => ["ROLE_ADMIN", "ROLE_MANAGER"].includes(get().user?.role ?? ""),
+      hasRole: (role) => hasRole(get().user, role),
+      hasAnyRole: (roles) => hasAnyRole(get().user, roles),
+      isAdmin: () => hasRole(get().user, "ROLE_ADMIN"),
+      isManager: () => hasAnyRole(get().user, ["ROLE_ADMIN", "ROLE_MANAGER"]),
       mustChangePassword: () => get().user?.mustChangePassword === true,
-      isSalesEmployee: () => get().user?.employeeCategory === "SALES",
+      isSalesEmployee: () => hasRole(get().user, "ROLE_SALES") || get().user?.employeeCategory === "SALES",
     }),
     { name: "kalinga-auth", partialize: (s) => ({ accessToken: s.accessToken, refreshToken: s.refreshToken, user: s.user, isAuthenticated: s.isAuthenticated }) },
   ),
