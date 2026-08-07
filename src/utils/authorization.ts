@@ -30,7 +30,7 @@ export const hasAnyRole = (
 export const ROUTE_ROLES: Record<string, readonly UserRole[]> = {
   "/dashboard": ["ROLE_ADMIN"],
   "/performance-dashboard": ["ROLE_ADMIN", "ROLE_MANAGER", "ROLE_SUPERVISOR", "ROLE_SALES", "ROLE_EMPLOYEE"],
-  "/employees": ["ROLE_ADMIN", "ROLE_MANAGER"],
+  "/employees": ["ROLE_ADMIN", "ROLE_HR", "ROLE_MANAGER"],
   "/attendance": ["ROLE_ADMIN", "ROLE_MANAGER", "ROLE_SUPERVISOR", "ROLE_EMPLOYEE"],
   "/leave": ["ROLE_ADMIN", "ROLE_EMPLOYEE"],
   "/holidays": ["ROLE_ADMIN", "ROLE_MANAGER", "ROLE_SUPERVISOR", "ROLE_EMPLOYEE"],
@@ -71,7 +71,9 @@ export const resolveHomeRoute = (
     ? ["/dashboard"]
     : hasRole(user, "ROLE_SALES") || user.employeeCategory === "SALES"
       ? ["/performance-dashboard"]
-      : hasRole(user, "ROLE_MANAGER")
+      : hasRole(user, "ROLE_HR")
+        ? ["/employees"]
+        : hasRole(user, "ROLE_MANAGER")
         ? ["/employees", "/production"]
         : hasRole(user, "ROLE_SUPERVISOR")
           ? ["/attendance", "/production"]

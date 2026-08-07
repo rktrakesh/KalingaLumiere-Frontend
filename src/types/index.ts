@@ -90,12 +90,16 @@ export interface Employee {
   employeeCategoryCode?: EmployeeCategory;
   employeeCategoryName?: string;
   currentSalary: number;
-  status: "ACTIVE" | "INACTIVE";
+  status: EmployeeStatus;
+  allowedNextStatuses: EmployeeStatus[];
+  noticeStartDate?: string | null;
+  lastWorkingDate?: string | null;
   createdBy?: string;
   createdDate?: string;
 }
 export interface CreateEmployeeRequest {
   createLogin: boolean;
+  status: "DRAFT" | "ACTIVE";
   name: string;
   phone?: string;
   address?: string;
@@ -723,6 +727,46 @@ export interface ManagementPerformanceDashboard {
   totalCollectionsPending: number;
   totalMonthlySales: number;
   totalIncentivePayout: number;
+}
+export type EmployeeStatus = "DRAFT" | "ACTIVE" | "ON_NOTICE" | "RESIGNED" | "INACTIVE";
+export interface ChangeEmployeeStatusRequest {
+  targetStatus: EmployeeStatus;
+  reason?: string;
+  noticeStartDate?: string;
+  lastWorkingDate?: string;
+}
+export type EmployeeDocumentType =
+  | "PROFILE_PHOTO"
+  | "IDENTITY_PROOF"
+  | "PAN"
+  | "BANK_PROOF"
+  | "CERTIFICATE"
+  | "DRIVING_LICENSE"
+  | "APPOINTMENT_LETTER"
+  | "SALARY_SLIP_ACKNOWLEDGEMENT";
+export type EmployeeDocumentStatus = "CURRENT" | "SUPERSEDED" | "ARCHIVED";
+export interface EmployeeDocument {
+  id: number;
+  employeeId: number;
+  documentType: EmployeeDocumentType;
+  originalFileName: string;
+  mimeType: string;
+  fileSize: number;
+  expiryDate?: string | null;
+  status: EmployeeDocumentStatus;
+  uploadedBy?: string;
+  uploadedAt: string;
+  required: boolean;
+  canManage: boolean;
+  canView: boolean;
+  canDownload: boolean;
+}
+export interface EmployeeDocumentList {
+  employeeId: number;
+  canManage: boolean;
+  requiredDocumentTypes: EmployeeDocumentType[];
+  supportedDocumentTypes: EmployeeDocumentType[];
+  documents: EmployeeDocument[];
 }
 
 export interface IncentiveSlab {

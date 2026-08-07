@@ -1,47 +1,23 @@
-import type { ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import {
-  AlertTriangle,
-  CheckCircle,
-  CreditCard,
-  FileText,
-  Package,
-  Timer,
-  TrendingDown,
-  TrendingUp,
-  Users,
-  UserX,
-  Wallet,
-} from 'lucide-react';
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
-import { dashboardApi } from '@/services/api/dashboard.api';
-import { Card } from '@/components/ui/Card';
-import { PageHeader } from '@/components/common/PageHeader';
-import { Badge } from '@/components/ui/Badge';
-import { Skeleton } from '@/components/ui/Skeleton';
-import { formatCurrency, formatNumber } from '@/utils/format';
-import { cn } from '@/utils/cn';
+import type { ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { AlertTriangle, CheckCircle, CreditCard, FileText, Package, Timer, TrendingDown, TrendingUp, Users, UserX, Wallet } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { dashboardApi } from "@/services/api/dashboard.api";
+import { Card } from "@/components/ui/Card";
+import { PageHeader } from "@/components/common/PageHeader";
+import { Badge } from "@/components/ui/Badge";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { formatCurrency, formatNumber } from "@/utils/format";
+import { cn } from "@/utils/cn";
 
-type MetricTone = 'gold' | 'green' | 'red' | 'orange' | 'neutral';
+type MetricTone = "gold" | "green" | "red" | "orange" | "neutral";
 
 const metricTones: Record<MetricTone, string> = {
-  gold: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-  green: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-  red: 'bg-red-500/10 text-red-600 dark:text-red-400',
-  orange: 'bg-orange-500/10 text-orange-600 dark:text-orange-400',
-  neutral: 'bg-gray-500/10 text-gray-500 dark:text-gray-400',
+  gold: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  green: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  red: "bg-red-500/10 text-red-600 dark:text-red-400",
+  orange: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
+  neutral: "bg-gray-500/10 text-gray-500 dark:text-gray-400",
 };
 
 interface DashboardPanelProps {
@@ -54,13 +30,11 @@ interface DashboardPanelProps {
 
 function DashboardPanel({ title, icon, children, className, action }: DashboardPanelProps) {
   return (
-    <Card padding="none" className={cn('dashboard-panel overflow-hidden', className)}>
+    <Card padding="none" className={cn("dashboard-panel overflow-hidden", className)}>
       <div className="flex min-h-10 items-center justify-between gap-3 border-b border-gray-200 px-3 py-2 dark:border-gray-700/60">
         <div className="flex min-w-0 items-center gap-2">
           <span className="text-brand-500">{icon}</span>
-          <h2 className="truncate text-[10px] font-semibold uppercase tracking-[0.1em] text-gray-700 dark:text-gray-200">
-            {title}
-          </h2>
+          <h2 className="truncate text-[10px] font-semibold uppercase tracking-[0.1em] text-gray-700 dark:text-gray-200">{title}</h2>
         </div>
         {action}
       </div>
@@ -77,7 +51,7 @@ interface MetricTileProps {
   helper?: string;
 }
 
-function MetricTile({ label, value, icon, tone = 'neutral', helper }: MetricTileProps) {
+function MetricTile({ label, value, icon, tone = "neutral", helper }: MetricTileProps) {
   return (
     <div className="dashboard-metric min-w-0 rounded-md border border-gray-200 p-2.5 dark:border-gray-700/60">
       <div className="flex items-start justify-between gap-2">
@@ -86,7 +60,7 @@ function MetricTile({ label, value, icon, tone = 'neutral', helper }: MetricTile
           <p className="mt-1 truncate text-base font-bold tabular-nums text-gray-900 dark:text-white">{value}</p>
           {helper && <p className="mt-0.5 truncate text-[9px] text-gray-400">{helper}</p>}
         </div>
-        <span className={cn('flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md', metricTones[tone])}>{icon}</span>
+        <span className={cn("flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md", metricTones[tone])}>{icon}</span>
       </div>
     </div>
   );
@@ -99,11 +73,11 @@ interface SnapshotRowProps {
   tone?: MetricTone;
 }
 
-function SnapshotRow({ label, value, icon, tone = 'neutral' }: SnapshotRowProps) {
+function SnapshotRow({ label, value, icon, tone = "neutral" }: SnapshotRowProps) {
   return (
     <div className="flex min-w-0 items-center justify-between gap-3 border-b border-gray-200 py-2 last:border-0 dark:border-gray-700/60">
       <div className="flex min-w-0 items-center gap-2">
-        <span className={cn('flex h-6 w-6 flex-shrink-0 items-center justify-center rounded', metricTones[tone])}>{icon}</span>
+        <span className={cn("flex h-6 w-6 flex-shrink-0 items-center justify-center rounded", metricTones[tone])}>{icon}</span>
         <span className="truncate text-[11px] text-gray-600 dark:text-gray-300">{label}</span>
       </div>
       <span className="truncate text-right text-xs font-semibold tabular-nums text-gray-900 dark:text-white">{value}</span>
@@ -116,7 +90,10 @@ function DashboardSkeleton() {
     <div className="space-y-3">
       <div className="mb-5 flex items-center gap-3">
         <Skeleton className="h-10 w-10" />
-        <div className="space-y-2"><Skeleton className="h-5 w-36" /><Skeleton className="h-3 w-52" /></div>
+        <div className="space-y-2">
+          <Skeleton className="h-5 w-36" />
+          <Skeleton className="h-3 w-52" />
+        </div>
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-12">
         <Skeleton className="h-44 md:col-span-1 xl:col-span-4" />
@@ -131,40 +108,33 @@ function DashboardSkeleton() {
 
 export default function DashboardPage() {
   const { data, isLoading } = useQuery({
-    queryKey: ['dashboard-admin'],
+    queryKey: ["dashboard-admin"],
     queryFn: () => dashboardApi.getAdmin(),
     refetchInterval: 60000,
   });
   const d = data?.data?.data;
 
-  const financeData = d ? [
-    { name: 'Revenue', value: d.monthlyRevenue, fill: '#dca62f' },
-    { name: 'Expenses', value: d.monthlyExpenses, fill: '#ef4444' },
-    { name: 'Profit', value: d.monthlyProfit, fill: '#22c55e' },
-  ] : [];
+  const financeData = d
+    ? [
+        { name: "Revenue", value: d.monthlyRevenue, fill: "#dca62f" },
+        { name: "Expenses", value: d.monthlyExpenses, fill: "#ef4444" },
+        { name: "Profit", value: d.monthlyProfit, fill: "#22c55e" },
+      ]
+    : [];
 
   const stockData = [
     ...(d?.rawMaterialStock?.slice(0, 5).map((stock) => ({ name: stock.materialName.slice(0, 10), stock: Number(stock.currentStock) })) ?? []),
     ...(d?.finishedGoodsStock?.slice(0, 3).map((stock) => ({ name: stock.materialName.slice(0, 10), stock: Number(stock.currentStock) })) ?? []),
   ];
 
-  const stockColors = ['#dca62f', '#ef4444', '#22c55e', '#f59e0b', '#a3a3a3'];
-  const hasPendingActions = Boolean(d && (
-    d.pendingOvertimeApprovals > 0
-    || d.pendingLoanApprovals > 0
-    || d.pendingLeaveApprovals > 0
-    || d.pendingCheckouts > 0
-  ));
+  const stockColors = ["#dca62f", "#ef4444", "#22c55e", "#f59e0b", "#a3a3a3"];
+  const hasPendingActions = Boolean(d && (d.pendingOvertimeApprovals > 0 || d.pendingLoanApprovals > 0 || d.pendingLeaveApprovals > 0 || d.pendingCheckouts > 0));
 
   if (isLoading) return <DashboardSkeleton />;
 
   return (
     <div className="dashboard-page">
-      <PageHeader
-        title="Dashboard"
-        subtitle={new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-        icon={<TrendingUp size={20} />}
-      />
+      <PageHeader title="Dashboard" subtitle={new Date().toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" })} icon={<TrendingUp size={20} />} />
 
       {hasPendingActions && (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2">
@@ -219,13 +189,15 @@ export default function DashboardPage() {
                 <YAxis tick={{ fontSize: 9 }} axisLine={false} tickLine={false} tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`} />
                 <Tooltip
                   formatter={(value: number) => formatCurrency(value)}
-                  contentStyle={{ backgroundColor: '#202425', border: '1px solid #4b4f50', borderRadius: 6, boxShadow: '0 12px 28px rgba(0,0,0,0.35)', fontSize: 11 }}
-                  labelStyle={{ color: '#f3c65d', fontWeight: 600 }}
-                  itemStyle={{ color: '#f5f5f4' }}
-                  cursor={{ fill: 'rgba(220,166,47,0.05)' }}
+                  contentStyle={{ backgroundColor: "#202425", border: "1px solid #4b4f50", borderRadius: 6, boxShadow: "0 12px 28px rgba(0,0,0,0.35)", fontSize: 11 }}
+                  labelStyle={{ color: "#f3c65d", fontWeight: 600 }}
+                  itemStyle={{ color: "#f5f5f4" }}
+                  cursor={{ fill: "rgba(220,166,47,0.05)" }}
                 />
                 <Bar dataKey="value" radius={[4, 4, 0, 0]} isAnimationActive={false}>
-                  {financeData.map((entry) => <Cell key={entry.name} fill={entry.fill} />)}
+                  {financeData.map((entry) => (
+                    <Cell key={entry.name} fill={entry.fill} />
+                  ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -242,35 +214,23 @@ export default function DashboardPage() {
           </div>
         </DashboardPanel>
 
-        <DashboardPanel
-          title="Inventory Health"
-          icon={<Package size={14} />}
-          className="md:col-span-2 xl:col-span-8"
-          action={(d?.lowStockAlerts ?? 0) > 0 ? <Badge variant="warning">{d?.lowStockAlerts} Low</Badge> : undefined}
-        >
+        <DashboardPanel title="Inventory Health" icon={<Package size={14} />} className="md:col-span-2 xl:col-span-8" action={(d?.lowStockAlerts ?? 0) > 0 ? <Badge variant="warning">{d?.lowStockAlerts} Low</Badge> : undefined}>
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-gray-400">Raw materials</p>
-              {d?.rawMaterialStock?.length ? d.rawMaterialStock.slice(0, 6).map((stock) => (
-                <SnapshotRow
-                  key={`${stock.materialName}-${stock.unit}`}
-                  label={stock.materialName}
-                  value={`${formatNumber(Number(stock.currentStock))} ${stock.unit}`}
-                  icon={<Package size={11} />}
-                />
-              )) : <p className="py-8 text-center text-xs text-gray-400">No raw material data</p>}
+              {d?.rawMaterialStock?.length ? (
+                d.rawMaterialStock.slice(0, 6).map((stock) => <SnapshotRow key={`${stock.materialName}-${stock.unit}`} label={stock.materialName} value={`${formatNumber(Number(stock.currentStock))} ${stock.unit}`} icon={<Package size={11} />} />)
+              ) : (
+                <p className="py-8 text-center text-xs text-gray-400">No raw material data</p>
+              )}
             </div>
             <div>
               <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-gray-400">Finished goods</p>
-              {d?.finishedGoodsStock?.length ? d.finishedGoodsStock.slice(0, 6).map((stock) => (
-                <SnapshotRow
-                  key={`${stock.materialName}-${stock.unit}`}
-                  label={stock.materialName}
-                  value={`${formatNumber(Number(stock.currentStock))} ${stock.unit}`}
-                  icon={<Package size={11} />}
-                  tone="gold"
-                />
-              )) : <p className="py-8 text-center text-xs text-gray-400">No finished goods data</p>}
+              {d?.finishedGoodsStock?.length ? (
+                d.finishedGoodsStock.slice(0, 6).map((stock) => <SnapshotRow key={`${stock.materialName}-${stock.unit}`} label={stock.materialName} value={`${formatNumber(Number(stock.currentStock))} ${stock.unit}`} icon={<Package size={11} />} tone="gold" />)
+              ) : (
+                <p className="py-8 text-center text-xs text-gray-400">No finished goods data</p>
+              )}
             </div>
           </div>
         </DashboardPanel>
@@ -281,19 +241,23 @@ export default function DashboardPage() {
               <ResponsiveContainer width="100%" height="100%" debounce={180}>
                 <PieChart>
                   <Pie data={stockData} cx="50%" cy="45%" innerRadius={46} outerRadius={72} paddingAngle={3} dataKey="stock" nameKey="name" isAnimationActive={false}>
-                    {stockData.map((entry, index) => <Cell key={`${entry.name}-${index}`} fill={stockColors[index % stockColors.length]} />)}
+                    {stockData.map((entry, index) => (
+                      <Cell key={`${entry.name}-${index}`} fill={stockColors[index % stockColors.length]} />
+                    ))}
                   </Pie>
                   <Tooltip
                     formatter={(value: number) => formatNumber(value)}
-                    contentStyle={{ backgroundColor: '#202425', border: '1px solid #4b4f50', borderRadius: 6, boxShadow: '0 12px 28px rgba(0,0,0,0.35)', fontSize: 11 }}
-                    labelStyle={{ color: '#f3c65d', fontWeight: 600 }}
-                    itemStyle={{ color: '#f5f5f4' }}
+                    contentStyle={{ backgroundColor: "#202425", border: "1px solid #4b4f50", borderRadius: 6, boxShadow: "0 12px 28px rgba(0,0,0,0.35)", fontSize: 11 }}
+                    labelStyle={{ color: "#f3c65d", fontWeight: 600 }}
+                    itemStyle={{ color: "#f5f5f4" }}
                   />
                   <Legend iconSize={8} wrapperStyle={{ fontSize: 9 }} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
-          ) : <div className="flex h-56 items-center justify-center text-xs text-gray-400">No stock data</div>}
+          ) : (
+            <div className="flex h-56 items-center justify-center text-xs text-gray-400">No stock data</div>
+          )}
         </DashboardPanel>
       </div>
     </div>

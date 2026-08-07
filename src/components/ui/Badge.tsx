@@ -15,9 +15,9 @@ export const Badge = ({ variant = 'neutral', children, className }: BadgeProps) 
 export const statusBadge = (status: string): BadgeVariant => {
   const map: Record<string,BadgeVariant> = {
     ACTIVE:'success', APPROVED:'success', PRESENT:'success', PAID:'success', COMPLETED:'success',
-    PENDING:'warning', PARTIAL:'warning', IN_PROGRESS:'warning', PENDING_APPROVAL:'warning', PENDING_CHECKOUT:'warning',
-    INACTIVE:'neutral', CLOSED:'neutral', GENERATED:'info', DRAFT:'info', PAID_LEAVE:'info',
-    ABSENT:'danger', REJECTED:'danger', CANCELLED:'danger',
+    PENDING:'warning', PARTIAL:'warning', IN_PROGRESS:'warning', PENDING_APPROVAL:'warning', PENDING_CHECKOUT:'warning', ON_NOTICE:'warning',
+    INACTIVE:'neutral', CLOSED:'neutral', GENERATED:'info', DRAFT:'info', PAID_LEAVE:'info', ARCHIVED:'neutral', SUPERSEDED:'neutral',
+    ABSENT:'danger', REJECTED:'danger', CANCELLED:'danger', RESIGNED:'danger',
     HOLIDAY:'purple', REGENERATED:'warning', LOCKED:'neutral', MODIFIED:'warning',
   };
   return map[status] ?? 'neutral';

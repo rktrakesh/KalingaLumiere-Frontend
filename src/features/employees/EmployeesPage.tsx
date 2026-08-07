@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Users, Plus, Eye, UserX, CalendarDays, IndianRupee } from "lucide-react";
+import { Users, Plus, Eye, CalendarDays, IndianRupee } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { employeesApi } from "@/services/api/employees.api";
 import { employeeMastersApi } from "@/services/api/employeeMasters.api";
@@ -23,9 +23,12 @@ import { usePagination } from "@/hooks/usePagination";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { EmployeeCalendarModal } from "./EmployeeCalendarModal";
 import { getApiErrorMessage } from "@/utils/apiError";
+import { useAuthStore } from "@/store/authStore";
+import { hasAnyRole, hasRole } from "@/utils/authorization";
 
 const createSchema = z.object({
   createLogin: z.preprocess((value) => value === true || value === "true", z.boolean()),
+  status: z.enum(["DRAFT", "ACTIVE"]),
   name: z.string().min(2, "Name required"),
   phone: z
     .string()
@@ -55,6 +58,10 @@ export default function EmployeesPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const toast = useToast();
+  const user = useAuthStore((state) => state.user);
+  const isAdmin = hasRole(user, "ROLE_ADMIN");
+  const canCreateEmployee = hasAnyRole(user, ["ROLE_ADMIN", "ROLE_HR"]);
+  const canViewAttendanceCalendar = isAdmin || hasRole(user, "ROLE_MANAGER");
   const { page, size, goToPage } = usePagination();
 
   const [search, setSearch] = useState("");
@@ -72,7 +79,7 @@ export default function EmployeesPage() {
   const pageData = data?.data?.data;
   const employees = pageData?.content ?? [];
 
-  const cForm = useForm<CreateForm>({ resolver: zodResolver(createSchema), defaultValues: { createLogin: false } });
+  const cForm = useForm<CreateForm>({ resolver: zodResolver(createSchema), defaultValues: { createLogin: false, status: "DRAFT" } });
   const selectedCategoryId = cForm.watch("employeeCategoryId");
   const sForm = useForm<SalaryForm>({ resolver: zodResolver(salarySchema) });
   const categoriesQuery = useQuery({ queryKey: ["employee-categories", "active"], queryFn: () => employeeMastersApi.getEmployeeCategories(), enabled: showCreate });
@@ -90,15 +97,6 @@ export default function EmployeesPage() {
     onError: (error: unknown) => toast.error(getApiErrorMessage(error, "Failed to create employee")),
   });
 
-  const deactivateM = useMutation({
-    mutationFn: (id: number) => employeesApi.deactivate(id),
-    onSuccess: () => {
-      toast.success("Employee deactivated");
-      qc.invalidateQueries({ queryKey: ["employees"] });
-    },
-    onError: (error: unknown) => toast.error(getApiErrorMessage(error, "Failed to deactivate")),
-  });
-
   const salaryM = useMutation({
     mutationFn: ({ id, data }: { id: number; data: SalaryForm }) => employeesApi.updateSalary(id, data),
     onSuccess: () => {
@@ -114,13 +112,13 @@ export default function EmployeesPage() {
     {
       key: "code",
       header: "Code",
-      render: (e) => (
+      render: (e) => canViewAttendanceCalendar ? (
         // Clickable employee code → opens calendar
         <button onClick={() => setCalEmployee(e)} className="font-mono text-xs font-bold text-brand-600 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-200 hover:underline underline-offset-2 transition-colors flex items-center gap-1" title="Click to view attendance calendar">
           <CalendarDays size={11} />
           {e.employeeCode}
         </button>
-      ),
+      ) : <span className="font-mono text-xs font-bold text-brand-600 dark:text-brand-400">{e.employeeCode}</span>,
     },
     {
       key: "name",
@@ -144,7 +142,7 @@ export default function EmployeesPage() {
           <Button size="sm" variant="ghost" icon={<Eye size={13} />} onClick={() => navigate(`/employees/${e.id}`)}>
             View
           </Button>
-          <Button
+          {isAdmin && <Button
             size="sm"
             variant="ghost"
             icon={<IndianRupee size={13} />}
@@ -154,15 +152,10 @@ export default function EmployeesPage() {
             }}
           >
             Salary
-          </Button>
-          <Button size="sm" variant="ghost" icon={<CalendarDays size={13} />} onClick={() => setCalEmployee(e)}>
+          </Button>}
+          {canViewAttendanceCalendar && <Button size="sm" variant="ghost" icon={<CalendarDays size={13} />} onClick={() => setCalEmployee(e)}>
             Calendar
-          </Button>
-          {e.status === "ACTIVE" && (
-            <Button size="sm" variant="ghost" icon={<UserX size={13} />} className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30" loading={deactivateM.isPending} onClick={() => deactivateM.mutate(e.id)}>
-              Deactivate
-            </Button>
-          )}
+          </Button>}
         </div>
       ),
     },
@@ -175,9 +168,9 @@ export default function EmployeesPage() {
         subtitle={`${pageData?.totalElements ?? 0} total employees`}
         icon={<Users size={20} />}
         actions={
-          <Button icon={<Plus size={15} />} onClick={() => setShowCreate(true)}>
+          canCreateEmployee ? <Button icon={<Plus size={15} />} onClick={() => setShowCreate(true)}>
             Add Employee
-          </Button>
+          </Button> : null
         }
       />
 
@@ -199,15 +192,18 @@ export default function EmployeesPage() {
             },
             options: [
               { value: "ACTIVE", label: "Active" },
+              { value: "DRAFT", label: "Draft" },
+              { value: "ON_NOTICE", label: "On Notice" },
+              { value: "RESIGNED", label: "Resigned" },
               { value: "INACTIVE", label: "Inactive" },
             ],
           },
         ]}
       />
 
-      <p className="text-xs text-gray-400 dark:text-gray-500 mb-3 flex items-center gap-1">
+      {canViewAttendanceCalendar && <p className="text-xs text-gray-400 dark:text-gray-500 mb-3 flex items-center gap-1">
         <CalendarDays size={11} /> Click the employee code to view attendance calendar
-      </p>
+      </p>}
 
       <DataTable columns={columns} data={employees} loading={isLoading} totalPages={pageData?.totalPages} currentPage={page} totalElements={pageData?.totalElements} pageSize={size} onPageChange={goToPage} rowKey={(e) => e.id} emptyMessage="No employees found. Add your first employee!" />
 
@@ -261,6 +257,7 @@ export default function EmployeesPage() {
           </div>
           <Select label="Department" placeholder="No department" options={(departmentsQuery.data?.data.data ?? []).map((item) => ({ value: String(item.id), label: item.name }))} {...cForm.register("departmentId")} />
           <Input label="Joining Date *" type="date" error={cForm.formState.errors.joiningDate?.message} {...cForm.register("joiningDate")} />
+          <Select label="Initial Status" options={[{ value: "DRAFT", label: "Draft (complete documents before activation)" }, { value: "ACTIVE", label: "Active" }]} {...cForm.register("status")} />
           <Input label="Monthly Salary (₹) *" type="number" error={cForm.formState.errors.currentSalary?.message} placeholder="e.g. 15000" {...cForm.register("currentSalary")} />
           <Input label="Address" placeholder="Full address" {...cForm.register("address")} className="col-span-2" />
           <Input label="Salary Remarks" placeholder="Reason for initial salary (optional)" {...cForm.register("salaryRemarks")} className="col-span-2" />

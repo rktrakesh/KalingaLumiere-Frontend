@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, User, Phone, MapPin, Calendar, Briefcase, IndianRupee, Target } from "lucide-react";
+import { ArrowLeft, User, Phone, MapPin, Calendar, Briefcase, IndianRupee, Target, Files, History, RefreshCw } from "lucide-react";
 import { employeesApi } from "@/services/api/employees.api";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge, statusBadge } from "@/components/ui/Badge";
@@ -11,14 +11,25 @@ import { SalaryHistory } from "@/types";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { PerformanceTargetsPanel } from "./PerformanceTargetsPanel";
+import { EmployeeDocumentsPanel } from "./EmployeeDocumentsPanel";
+import { EmployeeLifecycleModal } from "./EmployeeLifecycleModal";
+import { EmployeeProfilePhoto } from "./EmployeeProfilePhoto";
+import { useAuthStore } from "@/store/authStore";
+import { hasAnyRole } from "@/utils/authorization";
 
 export default function EmployeeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [activeSection, setActiveSection] = useState<"overview" | "performance">("overview");
+  const [activeSection, setActiveSection] = useState<"overview" | "salary" | "performance" | "documents">("overview");
+  const [showLifecycle, setShowLifecycle] = useState(false);
   const empId = Number(id);
+  const user = useAuthStore((state) => state.user);
+  const canManageLifecycle = hasAnyRole(user, ["ROLE_ADMIN", "ROLE_HR"]);
+  const canViewSalaryHistory = hasAnyRole(user, ["ROLE_ADMIN"]) || user?.employeeId === empId;
+  const canViewDocuments = hasAnyRole(user, ["ROLE_ADMIN", "ROLE_HR"])
+    || (user?.employeeId === empId && hasAnyRole(user, ["ROLE_EMPLOYEE", "ROLE_SALES"]));
   const { data: empData, isLoading } = useQuery({ queryKey: ["employee", empId], queryFn: () => employeesApi.getById(empId), enabled: !!empId });
-  const { data: histData } = useQuery({ queryKey: ["emp-sal-hist", empId], queryFn: () => employeesApi.getSalaryHistory(empId), enabled: !!empId });
+  const { data: histData, isLoading: salaryLoading } = useQuery({ queryKey: ["emp-sal-hist", empId], queryFn: () => employeesApi.getSalaryHistory(empId), enabled: !!empId && canViewSalaryHistory });
   const emp = empData?.data?.data;
   const history: SalaryHistory[] = histData?.data?.data ?? [];
 
@@ -46,23 +57,25 @@ export default function EmployeeDetailPage() {
         <Button variant="ghost" size="sm" icon={<ArrowLeft size={15} />} onClick={() => navigate("/employees")}>
           Back
         </Button>
-        <div>
+        <EmployeeProfilePhoto employeeId={emp.id} employeeName={emp.name} />
+        <div className="min-w-0">
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">{emp.name}</h1>
           <p className="text-sm text-gray-500">{emp.employeeCode}</p>
         </div>
         <Badge variant={statusBadge(emp.status)} className="ml-2">
           {emp.status}
         </Badge>
+        {canManageLifecycle && emp.allowedNextStatuses.length > 0 && <Button className="ml-auto" variant="outline" size="sm" icon={<RefreshCw size={14} />} onClick={() => setShowLifecycle(true)}>Change status</Button>}
       </div>
 
-      {isSalesEmployee && (
-        <div className="mb-5 flex gap-1 border-b border-gray-200 dark:border-gray-700" role="tablist" aria-label="Employee details">
-          <button type="button" role="tab" aria-selected={activeSection === "overview"} onClick={() => setActiveSection("overview")} className={`border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${activeSection === "overview" ? "border-brand-500 text-brand-600 dark:text-brand-400" : "border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-white"}`}>Overview</button>
-          <button type="button" role="tab" aria-selected={activeSection === "performance"} onClick={() => setActiveSection("performance")} className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${activeSection === "performance" ? "border-brand-500 text-brand-600 dark:text-brand-400" : "border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-white"}`}><Target size={15} />Performance &amp; Targets</button>
-        </div>
-      )}
+      <div className="mb-5 flex gap-1 overflow-x-auto border-b border-gray-200 dark:border-gray-700" role="tablist" aria-label="Employee details">
+        <DetailTab active={activeSection === "overview"} onClick={() => setActiveSection("overview")} icon={<User size={15} />}>Overview</DetailTab>
+        {canViewSalaryHistory && <DetailTab active={activeSection === "salary"} onClick={() => setActiveSection("salary")} icon={<History size={15} />}>Salary History</DetailTab>}
+        {isSalesEmployee && <DetailTab active={activeSection === "performance"} onClick={() => setActiveSection("performance")} icon={<Target size={15} />}>Performance &amp; Targets</DetailTab>}
+        {canViewDocuments && <DetailTab active={activeSection === "documents"} onClick={() => setActiveSection("documents")} icon={<Files size={15} />}>Documents</DetailTab>}
+      </div>
 
-      {activeSection === "overview" || !isSalesEmployee ? <>
+      {activeSection === "overview" && <>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
         <Card padding="md" className="md:col-span-2">
           <CardHeader>
@@ -74,6 +87,8 @@ export default function EmployeeDetailPage() {
               { icon: <Briefcase size={14} />, label: "Designation", value: emp.designation ?? "—" },
               { icon: <Phone size={14} />, label: "Phone", value: emp.phone ?? "—" },
               { icon: <Calendar size={14} />, label: "Joining Date", value: formatDate(emp.joiningDate) },
+              ...(emp.noticeStartDate ? [{ icon: <Calendar size={14} />, label: "Notice Start", value: formatDate(emp.noticeStartDate) }] : []),
+              ...(emp.lastWorkingDate ? [{ icon: <Calendar size={14} />, label: "Last Working Date", value: formatDate(emp.lastWorkingDate) }] : []),
               { icon: <MapPin size={14} />, label: "Address", value: emp.address ?? "—" },
               { icon: <IndianRupee size={14} />, label: "Current Salary", value: formatCurrency(emp.currentSalary) },
             ].map(({ icon, label, value }) => (
@@ -102,18 +117,20 @@ export default function EmployeeDetailPage() {
             </div>
             <div className="flex justify-between items-center py-2">
               <span className="text-sm text-gray-500">Salary History</span>
-              <span className="text-sm font-semibold">{history.length} records</span>
+              <span className="text-sm font-semibold">{canViewSalaryHistory ? `${history.length} records` : "Restricted"}</span>
             </div>
           </div>
         </Card>
       </div>
-      <Card padding="md">
-        <CardHeader>
-          <CardTitle>Salary History</CardTitle>
-        </CardHeader>
-        <DataTable columns={histCols} data={history} rowKey={(h) => h.id} emptyMessage="No salary history" />
-      </Card>
-      </> : <PerformanceTargetsPanel employeeId={emp.id} employeeName={emp.name} />}
+      </>}
+      {activeSection === "salary" && canViewSalaryHistory && <Card padding="md"><CardHeader><CardTitle>Salary History</CardTitle></CardHeader><DataTable columns={histCols} data={history} loading={salaryLoading} rowKey={(h) => h.id} emptyMessage="No salary history" /></Card>}
+      {activeSection === "performance" && isSalesEmployee && <PerformanceTargetsPanel employeeId={emp.id} employeeName={emp.name} />}
+      {activeSection === "documents" && canViewDocuments && <EmployeeDocumentsPanel employeeId={emp.id} />}
+      <EmployeeLifecycleModal employee={emp} isOpen={showLifecycle} onClose={() => setShowLifecycle(false)} />
     </div>
   );
+}
+
+function DetailTab({ active, onClick, icon, children }: { active: boolean; onClick: () => void; icon: React.ReactNode; children: React.ReactNode }) {
+  return <button type="button" role="tab" aria-selected={active} onClick={onClick} className={`flex shrink-0 items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${active ? "border-brand-500 text-brand-600 dark:text-brand-400" : "border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-white"}`}>{icon}{children}</button>;
 }
